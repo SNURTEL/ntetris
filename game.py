@@ -6,11 +6,13 @@ from random import randint
 
 class Game:
     """"""
+
     def __init__(self, screen):
         """
 
         :param screen: a curses.window instance used for displaying the UI
         """
+        self.screen = screen
         self.active = False
         self.settings = Settings()
         self.screen = screen
@@ -31,6 +33,7 @@ class Game:
 
     def update_screen(self):
         """Re-draws the UI"""
+        self.resize_window()
         self.draw_test()
 
     def check_events(self):
@@ -38,4 +41,13 @@ class Game:
         pass
 
     def draw_test(self):
-        self.screen.addstr(randint(0, 10), randint(0, 10), 'hemlo')
+
+        self.screen.addch(randint(0, 19), randint(0, 9), 'X')
+        time.sleep(0.1)
+
+    def resize_window(self):
+        y, x = 20, 10
+        curses.resizeterm(y, x)
+        is_resized = curses.is_term_resized(y, x)
+        if is_resized:
+            print('resized')
