@@ -2,6 +2,7 @@ import curses
 import time
 from settings import Settings
 from random import randint
+from classes import Board
 
 
 class Game:
@@ -12,12 +13,13 @@ class Game:
 
         :param screen: a curses.window instance used for displaying the UI
         """
-        self.screen = screen
-        self.active = False
         self.settings = Settings()
+        self.screen = screen  # TODO use private attributes
+        self.active = False
         self.screen = screen
+        self.board = Board(self)
         self.start_time = time.time()
-        self.period = 1.0 / self.settings.refresh_rate
+        self.period = 1.0 / self.settings.REFRESH_RATE
 
     def run_game(self):
         """Runs the main loop"""
@@ -34,7 +36,8 @@ class Game:
     def update_screen(self):
         """Re-draws the UI"""
         self.resize_window()
-        self.draw_test()
+        # self.draw_test()
+        self.draw_board()
 
     def check_events(self):
         """Checks for any events that could happen in the game"""
@@ -44,6 +47,10 @@ class Game:
 
         self.screen.addch(randint(0, 19), randint(0, 9), 'X')
         time.sleep(0.1)
+
+
+    def draw_board(self):
+        self.board.draw()
 
     def resize_window(self):
         y, x = 20, 10

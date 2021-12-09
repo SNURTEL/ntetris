@@ -3,8 +3,16 @@ from settings import Settings
 
 
 class Board:
-    def __init__(self):
-        self.settings = Settings()
-        self.size_x = self.settings.board_size[0]
-        self.size_y = self.settings.board_size[1]
-        self.board = [[None for i in range(self.size_y)] for j in range(self.size_x)]
+    def __init__(self, game):
+        self.screen = game.screen
+        self.settings = game.settings
+        self.size_x = self.settings.BOARD_SIZE[0]
+        self.size_y = self.settings.BOARD_SIZE[1]
+        self.test_char = 'X'
+        self.board = [[self.test_char for i in range(self.size_y)] for j in range(self.size_x)]
+
+
+    def draw(self):
+        for i in range(self.size_x):
+            for j in range(self.size_y):
+                self.screen.addch(j, i, self.board[i][j])  # FIXME RETURNED ERR DZIEKI MORDO
