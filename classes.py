@@ -11,8 +11,11 @@ class Board:
         self.test_char = 'X'
         self.board = [[self.test_char for i in range(self.size_y)] for j in range(self.size_x)]
 
-
     def draw(self):
         for i in range(self.size_x):
-            for j in range(self.size_y):
-                self.screen.addch(j, i, self.board[i][j])  # FIXME RETURNED ERR DZIEKI MORDO
+            for j in range(self.size_y ):
+                try:
+                    self.screen.addch(j, i, self.board[i][j])  # FIXME RETURNED ERR DZIEKI MORDO
+                except curses.error:
+                    pass
+

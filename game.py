@@ -30,14 +30,16 @@ class Game:
             self.update_screen()
             self.screen.refresh()
 
-            # wait till next tick
-            time.sleep(self.period - ((time.time() - self.start_time) % self.period))
+            self.wait_till_next_tick()
 
     def update_screen(self):
         """Re-draws the UI"""
         self.resize_window()
         # self.draw_test()
         self.draw_board()
+
+    def wait_till_next_tick(self):
+        time.sleep(self.period - ((time.time() - self.start_time) % self.period))
 
     def check_events(self):
         """Checks for any events that could happen in the game"""
@@ -47,7 +49,6 @@ class Game:
 
         self.screen.addch(randint(0, 19), randint(0, 9), 'X')
         time.sleep(0.1)
-
 
     def draw_board(self):
         self.board.draw()
