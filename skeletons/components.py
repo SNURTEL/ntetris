@@ -2,9 +2,20 @@ import curses
 from settings import Settings
 
 
-# pre-written
-class Board:
+class Composite:
+    def __init__(self):
+        pass
+
+    def draw(self):
+        pass
+
+    def update(self):
+        pass
+
+
+class Board(Composite):
     def __init__(self, game):
+        super().__init__()
         self.screen = game.screen
         self.settings = game.settings
         self.size_x = self.settings.BOARD_SIZE[0]
@@ -16,6 +27,9 @@ class Board:
         for i in range(self.size_x):
             for j in range(self.size_y):
                 try:
-                    self.screen.addch(j, i, self.board[i][j])  # FIXME RETURNED ERR DZIEKI MORDO
+                    self.screen.addch(j, i, self.board[i][j])
                 except curses.error:
                     pass
+
+    def update(self):
+        pass

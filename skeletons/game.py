@@ -1,12 +1,13 @@
 import curses
+import time
 from settings import Settings
+from components import Board
 
 
 class GameState:
     def __init__(self, game):
         self._game = game
         self._settings = Settings()
-        # board
 
     @property
     def game(self):
@@ -25,7 +26,7 @@ class Active(GameState):
         super().__init__(game)
 
     def handle_events(self):
-        pass
+        pass  # call update method on every component
 
 
 class Stopped(GameState):
@@ -33,7 +34,7 @@ class Stopped(GameState):
         super().__init__(game)
 
     def handle_events(self):
-        pass
+        pass  # call update method on every component
 
 
 class Game:
@@ -47,7 +48,11 @@ class Game:
         # components
         self._settings = Settings()
         self._screen = screen
+        self._board = Board(self)
 
+        # timing
+        self.start_time = time.time()
+        self.period = 1.0 / self.settings.REFRESH_RATE
 
     @property
     def active(self):
@@ -76,9 +81,22 @@ class Game:
     def switch_to_state(self, state: GameState):
         self.state = state
 
+    def handle_events(self):
+        self.state.handle_events()
+
+    def draw_components(self):
+        # call draw method on every component
+        pass
+
+    def wait_till_next_tick(self):
+        time.sleep(self.period - ((time.time() - self.start_time) % self.period))
+
     def run_game(self):
         self.switch_to_state(self.active)
 
-        # event loop
+        #  main event loop
+        while True:
+            self.handle_events()
+            self.draw_components()
 
-
+            self.wait_till_next_tick()
