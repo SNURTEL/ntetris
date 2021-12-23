@@ -4,7 +4,7 @@ import time
 from abc import ABC, abstractmethod
 # from game import Game  # cannot be used - circular import
 from random import randint
-from typing import Tuple, List, Sequence
+from typing import Tuple, List
 
 
 # TODO USE PRIVATE ATTRIBUTES!!!1!!111!1!1ONEONE
@@ -64,7 +64,10 @@ class Tile(Component):
         Draws the tile onto the screen
         :return:
         """
-        self.screen.addch(self.y, self.x, self._char, self._typeface)
+        try:
+            self.screen.addch(self.y, self.x, self._char, self._typeface)
+        except curses.error:
+            pass  # uhhhhhhh
 
     def update(self, x: int, y: int):
         """
@@ -95,9 +98,10 @@ class Board(Component):
 
         # tiles
         self.tiles = []
+        self.current_block = []
 
         # timing
-        self.period = game.settings.BLOCK_UPDATE_PERIOD
+        self.period = game.settings.BLOCK_MOVEMENT_PERIOD
         self.last_block_move = time.time()
         self.nowait = False
         self.new_block = True
@@ -135,47 +139,45 @@ class Board(Component):
         for tile in self.tiles:
             tile.draw()
 
-    def update(self, key: int) -> None:  # FIXME eww
+    def update(self, key: int) -> None:  # FIXME not the most elegant
         """
         Moves the tiles if necessary / removes tiles / spawns new tiles
         :param key: Key code passed by curses.getch
         """
-        tiles_to_move = self.tiles.copy()  # this is temporary
+        tiles_to_move = self.current_block
 
-        # handle keypresses  # left 260, right 261, down 258
-        if self.tiles:  # TODO separate function
-            if key == 258:
-                if not self.new_block:
+        if tiles_to_move:
+
+            # move tiles
+            if not self.nowait:
+                # handle horizontal movement
+                if key == 260:  # move left
+                    self.move_tiles(tiles_to_move, -1, 0)
+                    self.new_block = False
+                elif key == 261:  # move right
+                    self.move_tiles(tiles_to_move, 1, 0)
+                    self.new_block = False
+
+                # handle vertical movement
+                elif key == 258 and not self.new_block:
                     self.nowait = True
-                    self.move_tiles(tiles_to_move, 0, 1)  # down arrow -> hard drop
-            elif self.nowait:
-                self.move_tiles(tiles_to_move, 0, 1)  # hard drop
-            elif key == 260:
-                self.move_tiles(tiles_to_move, -1, 0)  # move left
-            elif key == 261:
-                self.move_tiles(tiles_to_move, 1, 0)  # move right
-            else:
-                self.new_block = False
-        else:
-            self.nowait = False
+                else:
+                    self.new_block = False
 
-        # delete bottom row; temporary
-        self.delete_tiles(self.size_y - 1)
-
-        # skip the regular move if down arrow was pressed
-        if self.nowait:
-            return
-
-        # move tiles or create a new block
-        if (time.time() - self.last_block_move) > self.period and not self.nowait:
-            if self.tiles:
+            # move down
+            if (time.time() - self.last_block_move) > self.period or self.nowait:
                 self.move_tiles(tiles_to_move, 0, 1)
-            else:
-                self.add_block(randint(0, 6), randint(0, 6))
-                self.new_block = True
-            self.last_block_move = time.time()
+                self.last_block_move = time.time()
 
-    def delete_tiles(self, row: int):
+            # self.current_block is cleared on collision in
+
+        else:
+            # spawn a new block
+            self.add_block(randint(0, 6), randint(0, 6))
+            self.nowait = False
+            self.new_block = True
+
+    def delete_row(self, row: int):
         """
         Deletes all tiles in a row
         :param row: Row index
@@ -191,13 +193,33 @@ class Board(Component):
         :param x: X offset
         :param y: Y offset
         """
-        if x and not all(0 <= tile.x + x <= self.size_x - 1 for tile in tiles_to_move):
-            x = 0
-        for _ in range(len(tiles_to_move)):
-            tile = tiles_to_move.pop(0)
-            tile.update(x, y)
+        tiles_to_move = tiles_to_move.copy()  # TODO maybe rework this
 
-    def add_block(self, block_id: int, x: int):  # FIXME gross; move to the constructor
+        if not any(tile.y == self.size_y-1 for tile in self.current_block):
+            if x and not all(0 <= tile.x + x <= self.size_x - 1 for tile in tiles_to_move):
+                x = 0
+            for _ in range(len(tiles_to_move)):
+                tile = tiles_to_move.pop(0)
+                tile.update(x, y)
+        else:
+            # clear current block
+            self.current_block.clear()
+
+        # tile_positions = {tile.x for tile in self.tiles}  # FIXME the dumb way, does not work
+        # block_positions = {tile.x + x for tile in self.current_block}
+        #
+        # if not tile_positions.intersection(block_positions):
+        #     # move block if no collisions
+        #     if x and not all(0 <= tile.x + x <= self.size_x - 1 for tile in tiles_to_move):
+        #         x = 0
+        #     for _ in range(len(tiles_to_move)):
+        #         tile = tiles_to_move.pop(0)
+        #         tile.update(x, y)
+        # else:
+        #     # clear current block
+        #     self.current_block.clear()
+
+    def add_block(self, block_id: int, x: int):
         """
         Adds a block of tiles to the board at a given x position
         :param block_id: Id used to access self.blocks and self.block_colors, containing, respectively, positions of
@@ -205,5 +227,11 @@ class Board(Component):
         :param x: Indicates where to spawn the block
         """
 
-        for position in self.blocks[block_id]:
-            self.tiles.append(Tile(self.game, (position[0] + x, position[1]), self.block_colors[block_id]))
+        new_block = [Tile(self.game, (position[0] + x, position[1]), self.block_colors[block_id])
+                     for position in self.blocks[block_id]]
+
+        self.tiles.extend(new_block)
+        self.current_block.extend(new_block)
+        #
+        # for position in self.blocks[block_id]:
+        #     self.tiles.append(Tile(self.game, (position[0] + x, position[1]), self.block_colors[block_id]))
