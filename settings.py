@@ -7,7 +7,7 @@ class Settings:
         self._REFRESH_RATE = 30  # hz
         self._BOARD_SIZE = (10, 20)  # x, y
         self._WINDOW_SIZE = self._BOARD_SIZE
-        self._BLOCK_UPDATE_PERIOD = 0.4  # s
+        self._BLOCK_MOVEMENT_PERIOD = 0.2  # s
 
     @property
     def REFRESH_RATE(self):
@@ -22,6 +22,6 @@ class Settings:
         return self._WINDOW_SIZE
 
     @property
-    def BLOCK_UPDATE_PERIOD(self):
-        return self._BLOCK_UPDATE_PERIOD
+    def BLOCK_MOVEMENT_PERIOD(self):
+        return self._BLOCK_MOVEMENT_PERIOD
 
