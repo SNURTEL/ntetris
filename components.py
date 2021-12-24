@@ -135,20 +135,18 @@ class Block(BlockPreset):
         for tile in self.tiles:
             tile.draw()
 
-    # TODO side collisions, bottom collisions
-
     def check_collisions(self, x, y):
         fields_to_check = [(tile.x + x, tile.y + y)
                            for tile in self.tiles
                            if (tile.x + x, tile.y + y) not in self.tile_positions]
-        return self.check_block_collisions(fields_to_check, x, y) \
+        return self.check_block_collisions(fields_to_check) \
                or self.check_bottom_edge(fields_to_check, y) \
                or self.check_sides(fields_to_check, x)
 
-    def check_block_collisions(self, fields_to_check, x, y):
+    def check_block_collisions(self, fields_to_check):
 
         return any(field in self.game.board.tile_positions for field in
-                   fields_to_check)  # TODO implement self.game.board.tile_positions
+                   fields_to_check)
 
     def check_bottom_edge(self, fields_to_check, y):
         if y:
@@ -171,12 +169,13 @@ class BoardState(ABC):
 
 class SoftDrop(BoardState):
 
-    @staticmethod
+    @staticmethod  # could not reference self.board, as class instances were initialized during
+    # Board class initialization
     def update(board, key=None):
         key_mapping = {260: (-1, 0),
                        261: (1, 0)}
 
-        direction = key_mapping.get(key, (0, 0))  # TODO find another way to get around KeyError 410
+        direction = key_mapping.get(key)
         if direction:
             if not board.block.check_collisions(*direction):
                 board.block.update(*direction)
@@ -212,7 +211,7 @@ class Board(Component):
         # tiles
         self.tiles = []
         self.block = None
-        self.tile_positions = []
+        self.tile_positions = []  # FIXME sub-optimal
 
         # timing
         self.period = game.settings.BLOCK_MOVEMENT_PERIOD
@@ -222,8 +221,6 @@ class Board(Component):
         self.soft_drop = SoftDrop()
         self.hard_drop = HardDrop()
         self.state = SoftDrop
-        self.nowait = False
-        self.new_block = True
 
     def draw(self) -> None:
         """
@@ -242,23 +239,26 @@ class Board(Component):
         :param key: Key code passed by curses.getch
         """
 
-        if self.block:  # try
-            if key == 258:
+        try:  # if self.block
+            if key == 258:  # down arrow
                 self.state = self.hard_drop
 
+            # update block's position, either move down (HardDrop) or
+            # handle keypresses and move down if enough time passed
             self.state.update(self, key)
 
+            # if block lies on top of another block / on the bottom edge
             if self.block.check_collisions(0, 1):
+
                 self.tiles.extend(self.block.tiles)
                 self.tile_positions.extend(self.block.tile_positions)
                 # del self.block
                 self.block = None
 
-        else:  # except AttributeError
+        except AttributeError:  # except AttributeError
             # spawn a new block
             self.state = self.soft_drop
             self.add_block(randint(0, 6), randint(0, 6))
-
 
     def delete_row(self, row: int):
         """
@@ -275,22 +275,8 @@ class Board(Component):
         :param x: X offset
         :param y: Y offset
         """
-
         self.block.update(x, y)
 
-        # tile_positions = {tile.x for tile in self.tiles}  # FIXME the dumb way, does not work
-        # block_positions = {tile.x + x for tile in self.block}
-        #
-        # if not tile_positions.intersection(block_positions):
-        #     # move block if no collisions
-        #     if x and not all(0 <= tile.x + x <= self.size_x - 1 for tile in tiles_to_move):
-        #         x = 0
-        #     for _ in range(len(tiles_to_move)):
-        #         tile = tiles_to_move.pop(0)
-        #         tile.update(x, y)
-        # else:
-        #     # clear current block
-        #     self.block.clear()
 
     def add_block(self, block_id: int, x: int):
         """
@@ -299,10 +285,5 @@ class Board(Component):
         tiles within a block and block colors (both matching original Tetris tetrominoes)
         :param x: Indicates where to spawn the block
         """
-
-        # new_block = [Tile(self.game, (position[0] + x, position[1]), self.color_presets[block_id])
-        #              for position in self.block_presets[block_id]]
         self.block = Block(self.game, block_id, x)
-        #
-        # for position in self.block_presets[block_id]:
-        #     self.tiles.append(Tile(self.game, (position[0] + x, position[1]), self.color_presets[block_id]))
+
