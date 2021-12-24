@@ -122,7 +122,7 @@ class Game:
         self.start_time = time.time()
         self.period = 1.0 / self.settings.REFRESH_RATE
 
-        # block_colors
+        # color_presets
         curses.init_pair(11, curses.COLOR_CYAN, curses.COLOR_BLACK)
         curses.init_pair(12, curses.COLOR_BLUE, curses.COLOR_BLACK)
         curses.init_color(250, 1000, 500, 0)  # does not work in pycharm terminal
