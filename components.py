@@ -1,10 +1,12 @@
 from __future__ import annotations
 import curses
+import random
 import time
 from abc import ABC, abstractmethod
 # from game import Game  # cannot be used - circular import
 from random import randint
 from typing import Tuple, List
+import sys
 
 
 # TODO USE PRIVATE ATTRIBUTES!!!1!!111!1!1ONEONE
@@ -135,23 +137,22 @@ class Block(BlockPreset):
         for tile in self.tiles:
             tile.draw()
 
-    # TODO side collisions, bottom collisions
-
     def check_collisions(self, x, y):
         fields_to_check = [(tile.x + x, tile.y + y)
                            for tile in self.tiles
                            if (tile.x + x, tile.y + y) not in self.tile_positions]
-        return self.check_block_collisions(fields_to_check, x, y) \
+        return self.check_block_collisions(fields_to_check) \
                or self.check_bottom_edge(fields_to_check, y) \
                or self.check_sides(fields_to_check, x)
 
-    def check_block_collisions(self, fields_to_check, x, y):
+    def check_block_collisions(self, fields_to_check):
 
         return any(field in self.game.board.tile_positions for field in
-                   fields_to_check)  # TODO implement self.game.board.tile_positions
+                   fields_to_check)
 
     def check_bottom_edge(self, fields_to_check, y):
         if y:
+            # sys.exit()
             return any(field[1] == self.game.board.size_y for field in fields_to_check)
         return False
 
@@ -162,7 +163,6 @@ class Block(BlockPreset):
 
 
 class BoardState(ABC):
-
     @staticmethod
     @abstractmethod
     def update(board, key):
@@ -170,25 +170,24 @@ class BoardState(ABC):
 
 
 class SoftDrop(BoardState):
-
-    @staticmethod
+    @staticmethod  # could not reference self.board, as class instances were initialized during
+    # Board class initialization
     def update(board, key=None):
         key_mapping = {260: (-1, 0),
                        261: (1, 0)}
-
-        direction = key_mapping.get(key, (0, 0))  # TODO find another way to get around KeyError 410
+        direction = key_mapping.get(key, None)
         if direction:
-            if not board.block.check_collisions(*direction):
+            if not board.block.check_collisions(*direction):  # checks only L/R collisions
                 board.block.update(*direction)
-            if (time.time() - board.last_block_move) > board.period:
-                board.block.update(0, 1)
-                board.last_block_move = time.time()
+
+        if (time.time() - board.last_block_move) > board.period:  # move down
+            board.block.update(0, 1)
+            board.last_block_move = time.time()
 
 
 class HardDrop(BoardState):
-
     @staticmethod
-    def update(board, key=None):
+    def update(board, key=None):  # just move down lol
         board.block.update(0, 1)
 
 
@@ -212,7 +211,8 @@ class Board(Component):
         # tiles
         self.tiles = []
         self.block = None
-        self.tile_positions = []
+        self.tile_positions = []  # FIXME sub-optimal
+        self.rows = [[] for _ in range(self.size_y)]
 
         # timing
         self.period = game.settings.BLOCK_MOVEMENT_PERIOD
@@ -222,8 +222,6 @@ class Board(Component):
         self.soft_drop = SoftDrop()
         self.hard_drop = HardDrop()
         self.state = SoftDrop
-        self.nowait = False
-        self.new_block = True
 
     def draw(self) -> None:
         """
@@ -242,67 +240,62 @@ class Board(Component):
         :param key: Key code passed by curses.getch
         """
 
-        if self.block:  # try
-            if key == 258:
-                self.state = self.hard_drop
-
-            self.state.update(self, key)
-
+        try:  # or if self.block
+            # if block lies on top of another block / on the bottom edge
             if self.block.check_collisions(0, 1):
                 self.tiles.extend(self.block.tiles)
                 self.tile_positions.extend(self.block.tile_positions)
-                # del self.block
-                self.block = None
 
-        else:  # except AttributeError
+                for tile in self.block.tiles:
+                    self.rows[tile.y].append(tile)
+
+                # self.delete_full_rows()
+
+                del self.block
+                return
+
+            if key == 258:  # down arrow
+                self.state = self.hard_drop
+
+            # update block position, either move down (HardDrop) or
+            # handle keypresses and move down if enough time passed (SoftDrop)
+            self.state.update(self, key)
+
+        except AttributeError:  # or else
             # spawn a new block
             self.state = self.soft_drop
-            self.add_block(randint(0, 6), randint(0, 6))
+
+            self.block = Block(self.game, randint(0, 6), randint(0, 6))
+
+    # def delete_full_rows(self):  # TODO Does not work # check if rows are full
+    # TODO rework tile storing
+    #  mechanism, rows and positions cannot be stored separetely from tiles, as it leads to unresolvable errors
 
 
-    def delete_row(self, row: int):
-        """
-        Deletes all tiles in a row
-        :param row: Row index
-        """
-        tiles_to_delete = [self.tiles.index(tile) for tile in self.tiles if tile.y == row]
-        for idx in reversed(tiles_to_delete):
-            del self.tiles[idx]
+    #  rows_to_check = {tile.y-1 for tile in self.block.tiles}
+    #
+    #     rows_to_add = 0
+    #     for row_idx in rows_to_check:
+    #         if len(self.rows[row_idx]) == 0:
+    #             # remove from self.rows
+    #             for popped_tile in self.rows.pop(row_idx):
+    #                 # remove tiles from self.tiles
+    #                 print((popped_tile.x, popped_tile.y))
+    #                 self.tile_positions.remove((popped_tile.x, popped_tile.y))
+    #
+    #                 self.tiles.remove(popped_tile)
+    #
+    #             for tile in self.tiles:
+    #                 tile.y += 1
+    #             for pos in self.tile_positions:
+    #                 self.tile_positions.remove(pos)
+    #                 self.tile_positions.append((pos[0], pos[1]+ 1))
+    #
+    #
+    #                 # del popped_tile  # does not do anything (?)
+    #
+    #             # insert a new row on top to compensate for the popped one
+    #             rows_to_add += 1
+    #     self.rows.insert(rows_to_add, [])
 
-    def move_tiles(self, x: int, y: int):
-        """
-        Moves the tiles by a given offset (if possible)
-        :param x: X offset
-        :param y: Y offset
-        """
-
-        self.block.update(x, y)
-
-        # tile_positions = {tile.x for tile in self.tiles}  # FIXME the dumb way, does not work
-        # block_positions = {tile.x + x for tile in self.block}
-        #
-        # if not tile_positions.intersection(block_positions):
-        #     # move block if no collisions
-        #     if x and not all(0 <= tile.x + x <= self.size_x - 1 for tile in tiles_to_move):
-        #         x = 0
-        #     for _ in range(len(tiles_to_move)):
-        #         tile = tiles_to_move.pop(0)
-        #         tile.update(x, y)
-        # else:
-        #     # clear current block
-        #     self.block.clear()
-
-    def add_block(self, block_id: int, x: int):
-        """
-        Adds a block of tiles to the board at a given x position
-        :param block_id: Id used to access self.block_presets and self.color_presets, containing, respectively, positions of
-        tiles within a block and block colors (both matching original Tetris tetrominoes)
-        :param x: Indicates where to spawn the block
-        """
-
-        # new_block = [Tile(self.game, (position[0] + x, position[1]), self.color_presets[block_id])
-        #              for position in self.block_presets[block_id]]
-        self.block = Block(self.game, block_id, x)
-        #
-        # for position in self.block_presets[block_id]:
-        #     self.tiles.append(Tile(self.game, (position[0] + x, position[1]), self.color_presets[block_id]))
+# TODO docstrings
