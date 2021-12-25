@@ -24,4 +24,3 @@ class Settings:
     @property
     def BLOCK_MOVEMENT_PERIOD(self):
         return self._BLOCK_MOVEMENT_PERIOD
-
