@@ -69,9 +69,10 @@ class Active(GameState):
         """
         Draws the board and the UI
         """
-        self.game.screen.clear()
+        self.game.screen.erase()
         self.resize_window()
         self.game.board.draw()
+
         self.game.screen.refresh()
 
 
@@ -117,6 +118,9 @@ class Game:
         # window
         self.window_size = self._settings.WINDOW_SIZE
         curses.curs_set(False)
+
+        # self._screen.idcok(False)  # use if flickering appears
+        # self._screen.idlok(False)
 
         # timing
         self.start_time = time.time()

@@ -1,11 +1,10 @@
 from __future__ import annotations
 import curses
-import random
 import time
 from abc import ABC, abstractmethod
 # from game import Game  # cannot be used - circular import
 from random import randint
-from typing import Tuple, List
+from typing import Tuple, List, Set
 import sys
 
 
@@ -61,6 +60,10 @@ class Tile(Component):
         self._typeface = color
         self.x, self.y = position
 
+    @property
+    def position(self):
+        return self.x, self.y
+
     def draw(self, *args, **kwargs):
         """
         Draws the tile onto the screen
@@ -69,7 +72,7 @@ class Tile(Component):
         try:
             self.screen.addch(self.y, self.x, self._char, self._typeface)
         except curses.error:
-            pass  # uhhhhhhh
+            pass  # uhhhhhhh this WILL cause errors
 
     def update(self, x: int, y: int):
         """
@@ -82,7 +85,15 @@ class Tile(Component):
 
 
 class BlockPreset(Component):  # NOT the best way to keep presets
+    """
+    Keeps all the information necessary for creating new blocks
+    """
+
     def __init__(self, game):
+        """
+        Inits class BlockPreset
+        :param game: Game instance passed by the game itself
+        """
         super(BlockPreset, self).__init__(game)
         # ugly; block presets
         self.block_presets = (
@@ -110,84 +121,160 @@ class BlockPreset(Component):  # NOT the best way to keep presets
         self.color_presets = (curses.color_pair(11), curses.color_pair(12), curses.color_pair(13), curses.color_pair(
             14), curses.color_pair(15), curses.color_pair(16), curses.color_pair(17))
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs) -> None:
+        """
+        Updates the block's position
+        :param args: Ignored
+        :param kwargs: Ignored
+        """
         super().update()
 
-    def draw(self):
+    def draw(self) -> None:
+        """
+        Draws the block onto the screen
+        """
         super().draw()
 
 
 class Block(BlockPreset):
-    def __init__(self, game, block_id: int, x):
+    """
+    Class representing a block of tiles. When the block is placed, tiles are moved to board.tiles and
+    the class instance is deleted
+    """
+
+    def __init__(self, game, block_id: int, x: int):
+        """
+        Inits class Block
+        :param game: Game instance passed by the game itself
+        :param block_id: Indicates which block to spawn, block presets are stored in the superclass
+        :param x: Indicates where to spawn the block, corresponds to block's upper left corner
+        """
         super(Block, self).__init__(game)
         self.tiles = [Tile(self.game, (position[0] + x, position[1]), self.color_presets[block_id])
                       for position in self.block_presets[block_id]]
-        self.tile_positions = self.update_tile_positions()
 
     def update(self, x: int, y: int):
+        """
+        Updated the block's position by a given offset
+        :param x: X offset
+        :param y: Y offset
+        """
         for tile in self.tiles:
             tile.update(x, y)
 
-        self.tile_positions = self.update_tile_positions()
-
-    def update_tile_positions(self) -> List[Tuple[int, int]]:
-        return [(tile.x, tile.y) for tile in self.tiles]
-
     def draw(self, *args, **kwargs):
+        """
+        Draws the block onto the screen
+        :param args: Ignored
+        :param kwargs: Ignored
+        """
         for tile in self.tiles:
             tile.draw()
 
-    def check_collisions(self, x, y):
-        fields_to_check = [(tile.x + x, tile.y + y)
-                           for tile in self.tiles
-                           if (tile.x + x, tile.y + y) not in self.tile_positions]
-        return self.check_block_collisions(fields_to_check) \
-               or self.check_bottom_edge(fields_to_check, y) \
-               or self.check_sides(fields_to_check, x)
+    def check_side_collisions(self, x: int) -> bool:
+        """
+        Checks if the block is located next to a tile or at the board's edge
+        :param x: Indicates the direction in which the check should be performed
+        :return: True if the block is located next to a tile or at the board's edge, False if it's not
+        """
+        fields_to_check = self._get_fields_to_check(x, 0)
+        return self._check_block_collisions(fields_to_check) or self._check_sides(fields_to_check)
 
-    def check_block_collisions(self, fields_to_check):
+    def check_bottom_collisions(self):
+        """
+        Checks if the block is located on top of a tile or at the board's bottom edge
+        :return: True if the block is located on top of a tile or at the board's bottom edge, False if it's not
+        """
+        fields_to_check = self._get_fields_to_check(0, 1)
+        return self._check_block_collisions(fields_to_check) or self._check_bottom_edge(fields_to_check)
 
-        return any(field in self.game.board.tile_positions for field in
-                   fields_to_check)
+    def _get_fields_to_check(self, x: int, y: int) -> Set[Tuple[int, int]]:
+        """
+        Generates (self.x + x,self.y + y) pairs which will later be checked if they contain any obstacles
+        :param x: X offset
+        :param y: Y offset
+        :return: A set of (x, y) pairs
+        """
+        return {(tile.x + x, tile.y + y) for tile in self.tiles}
 
-    def check_bottom_edge(self, fields_to_check, y):
-        if y:
-            # sys.exit()
-            return any(field[1] == self.game.board.size_y for field in fields_to_check)
-        return False
+    def _check_block_collisions(self, fields_to_check: Set[Tuple[int, int]]) -> bool:
+        """
+        Checks for potential collision with other tiles
+        :param fields_to_check: (x, y) pairs to be checked if they contain a tile
+        :return: True if at least one of fields_to_check contains a tile, False if it does not
+        """
+        board_tile_positions = {tile.position for tile in self.game.board.tiles}
+        return bool(board_tile_positions.intersection(fields_to_check))
 
-    def check_sides(self, fields_to_check, x):
-        if x:
-            return any(field[0] < 0 or field[0] == self.game.board.size_x for field in fields_to_check)
-        return False
+    def _check_bottom_edge(self, fields_to_check: Set[Tuple[int, int]]) -> bool:
+        """
+        Checks if the block sits at the board's bottom edge
+        :param fields_to_check: (x, y) pairs to be checked if they are located below board's bottom edge
+        :return: True if the block sits at the board's bottom edge, false if it does not
+        """
+        return any(field[1] == self.game.board.size_y for field in fields_to_check)
+
+    def _check_sides(self, fields_to_check: Set[Tuple[int, int]]) -> bool:
+        """
+        Checks if the block is located next to the board's edge
+        :param fields_to_check: (x, y) pairs to be checked if any of them is not located on the board
+        :return: True if the block is located next to the board's edge, False if it's not
+        """
+        return any(field[0] < 0 or field[0] == self.game.board.size_x for field in fields_to_check)
 
 
 class BoardState(ABC):
-    @staticmethod
+    """
+    Base class for classes indicating the ways in which the board should be updated
+    """
+    @staticmethod  # could not reference self.board, as class instances were initialized during
+    # Board class initialization
     @abstractmethod
-    def update(board, key):
+    def update(board: Board, key: int):
+        """
+        Moves the tiles and / or the current block and handles user input
+        :param board: Board class instance passed by the board itself
+        :param key: Keyboard key id extracted by curses.getch
+        """
         pass
 
 
 class SoftDrop(BoardState):
-    @staticmethod  # could not reference self.board, as class instances were initialized during
-    # Board class initialization
-    def update(board, key=None):
-        key_mapping = {260: (-1, 0),
-                       261: (1, 0)}
-        direction = key_mapping.get(key, None)
-        if direction:
-            if not board.block.check_collisions(*direction):  # checks only L/R collisions
-                board.block.update(*direction)
+    """
+    Game state handling events if the down arrow key was not yet pressed
+    """
+    @staticmethod
+    def update(board: Board, key: int):
+        """
+        Handles horizontal movement on key press and moves the tile down if board.block_move_period passed
+        :param board: Board class instance passed by the board itself
+        :param key: Keyboard key id extracted by curses.getch
+        """
+        # handle horizontal movement
+        key_mapping = {260: -1,
+                       261: 1}
+        x_direction = key_mapping.get(key, None)
+        if x_direction:
+            if not board.block.check_side_collisions(x_direction):
+                board.block.update(x_direction, 0)
 
-        if (time.time() - board.last_block_move) > board.period:  # move down
+        # handle vertical movement
+        if (time.time() - board.last_block_move) > board.block_move_period:
             board.block.update(0, 1)
             board.last_block_move = time.time()
 
 
 class HardDrop(BoardState):
+    """
+    Game state handling events if arrow down key was pressed
+    """
     @staticmethod
-    def update(board, key=None):  # just move down lol
+    def update(board: Board, key=None):
+        """
+        Moves the tiles down by 1 field
+        :param board: Board class instance passed by the board itself
+        :param key: Ignored
+        """
         board.block.update(0, 1)
 
 
@@ -211,11 +298,9 @@ class Board(Component):
         # tiles
         self.tiles = []
         self.block = None
-        self.tile_positions = []  # FIXME sub-optimal
-        self.rows = [[] for _ in range(self.size_y)]
 
         # timing
-        self.period = game.settings.BLOCK_MOVEMENT_PERIOD
+        self.block_move_period = game.settings.BLOCK_MOVEMENT_PERIOD
         self.last_block_move = time.time()
 
         # event handling
@@ -242,14 +327,21 @@ class Board(Component):
 
         try:  # or if self.block
             # if block lies on top of another block / on the bottom edge
-            if self.block.check_collisions(0, 1):
+            if self.block.check_bottom_collisions():
+
+                # move tiles from block.tiles to self.tiles and delete the block object
                 self.tiles.extend(self.block.tiles)
-                self.tile_positions.extend(self.block.tile_positions)
 
-                for tile in self.block.tiles:
-                    self.rows[tile.y].append(tile)
+                # check if any rows are full
+                rows_to_delete = self.get_full_rows_idx({tile.y for tile in self.block.tiles})
 
-                # self.delete_full_rows()
+                if rows_to_delete:
+                    # remove full rows
+                    self.tiles = [tile for tile in self.tiles if tile.y not in rows_to_delete]
+
+                    # move tiles down
+                for tile in self.tiles:
+                    tile.update(0, sum(tile.y < row_idx for row_idx in rows_to_delete))
 
                 del self.block
                 return
@@ -265,37 +357,8 @@ class Board(Component):
             # spawn a new block
             self.state = self.soft_drop
 
-            self.block = Block(self.game, randint(0, 6), randint(0, 6))
+            self.block = Block(self.game, randint(0, 6), randint(0, self.size_x - 4))
 
-    # def delete_full_rows(self):  # TODO Does not work # check if rows are full
-    # TODO rework tile storing
-    #  mechanism, rows and positions cannot be stored separetely from tiles, as it leads to unresolvable errors
-
-
-    #  rows_to_check = {tile.y-1 for tile in self.block.tiles}
-    #
-    #     rows_to_add = 0
-    #     for row_idx in rows_to_check:
-    #         if len(self.rows[row_idx]) == 0:
-    #             # remove from self.rows
-    #             for popped_tile in self.rows.pop(row_idx):
-    #                 # remove tiles from self.tiles
-    #                 print((popped_tile.x, popped_tile.y))
-    #                 self.tile_positions.remove((popped_tile.x, popped_tile.y))
-    #
-    #                 self.tiles.remove(popped_tile)
-    #
-    #             for tile in self.tiles:
-    #                 tile.y += 1
-    #             for pos in self.tile_positions:
-    #                 self.tile_positions.remove(pos)
-    #                 self.tile_positions.append((pos[0], pos[1]+ 1))
-    #
-    #
-    #                 # del popped_tile  # does not do anything (?)
-    #
-    #             # insert a new row on top to compensate for the popped one
-    #             rows_to_add += 1
-    #     self.rows.insert(rows_to_add, [])
-
-# TODO docstrings
+    def get_full_rows_idx(self, to_check: Set[int]) -> List[int]:
+        tile_y = [tile.y for tile in self.tiles]
+        return [idx for idx in to_check if tile_y.count(idx) == self.size_x]
