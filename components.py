@@ -4,7 +4,7 @@ import time
 from abc import ABC, abstractmethod
 # from game import Game  # cannot be used - circular import
 from random import randint
-from typing import Tuple, List, Set
+from typing import Tuple, List, Set, Union
 import sys
 
 
@@ -61,13 +61,16 @@ class Tile(Component):
         self.x, self.y = position
 
     @property
-    def position(self):
+    def position(self) -> Tuple[int, int]:
+        """
+        Returns tile's position on the board
+        :return: Tile's position on the board
+        """
         return self.x, self.y
 
     def draw(self, *args, **kwargs):
         """
         Draws the tile onto the screen
-        :return:
         """
         try:
             self.screen.addch(self.y, self.x, self._char, self._typeface)
@@ -125,6 +128,7 @@ class BlockPreset(Component):  # NOT the best way to keep presets
         self.pivot_point_presets = dict.fromkeys(list(range(1, 7)), [1 + x, 0])
         self.pivot_point_presets[0] = [1 + x, 1]
 
+    @abstractmethod
     def update(self, *args, **kwargs) -> None:
         """
         Updates the block's position
@@ -133,6 +137,7 @@ class BlockPreset(Component):  # NOT the best way to keep presets
         """
         super().update()
 
+    @abstractmethod
     def draw(self) -> None:
         """
         Draws the block onto the screen
@@ -224,13 +229,10 @@ class Block(BlockPreset):
         # get expected positions
         fields_to_check = self._get_rotated_positions(direction)
 
-        # get position tuples for every tile on the board
-        tile_positions = self.game.board.tile_positions
-        for position in fields_to_check:
-            if not 0 <= position[0] < self.game.board.size_x or not 0 <= position[
-                    1] < self.game.board.size_y or position in tile_positions:
-                return False
-        return True
+        return all(not self.game.board.get_tile(x, y)
+                   and 0 <= x < self.game.board.size_x
+                   and 0 <= y < self.game.board.size_y
+                   for x, y in fields_to_check)
 
     def check_side_collisions(self, x: int) -> bool:
         """
@@ -264,9 +266,7 @@ class Block(BlockPreset):
         :param fields_to_check: (x, y) pairs to be checked if they contain a tile
         :return: True if at least one of fields_to_check contains a tile, False if it does not
         """
-        board_tile_positions = self.game.board.tile_positions
-        # return bool(board_tile_positions.intersection(fields_to_check))
-        return any(field in fields_to_check for field in board_tile_positions)
+        return any(bool(self.game.board.get_tile(x, y)) for x, y in fields_to_check)
 
     def _check_bottom_edge(self, fields_to_check: List[Tuple[int, int]]) -> bool:
         """
@@ -274,7 +274,7 @@ class Block(BlockPreset):
         :param fields_to_check: (x, y) pairs to be checked if they are located below board's bottom edge
         :return: True if the block sits at the board's bottom edge, false if it does not
         """
-        return any(field[1] == self.game.board.size_y for field in fields_to_check)
+        return any(self.game.board.get_tile(x, y, True) is True for x, y in fields_to_check)
 
     def _check_sides(self, fields_to_check: List[Tuple[int, int]]) -> bool:
         """
@@ -377,7 +377,7 @@ class Board(Component):
         self.size_y = self.settings.BOARD_SIZE[1]
 
         # tiles
-        self.tiles = []
+        self.grid = [[None for _ in range(self.size_y)] for _ in range(self.size_x)]
         self.block = None
 
         # timing
@@ -393,12 +393,35 @@ class Board(Component):
     def tile_positions(self):
         return [tile.position for tile in self.tiles]
 
+    @property
+    def tiles(self) -> List[Tile]:
+        """
+        Returns all tiles on the board
+        :return: A list of all tiles on the board
+        """
+        # this will never return None, type checking errors should be ignored
+        return [t for column in self.grid for t in column if t]
+
+    def get_tile(self, x, y, default=None) -> Union[Tile, None]:
+        """
+        Similat to dict's method .get, tries to return the tile located at (x, y), returns default if there's none
+        :param x: Tile's x coordinate
+        :param y: Tile's y coordinate
+        :param default: Value to be returned if there's no tile at (x, y)
+        :return: A Tile instance or None / default
+        """
+        try:
+            return self.grid[x][y]
+        except IndexError:
+            return default
+
     def draw(self) -> None:
         """
         Draws the board
         """
         for tile in self.tiles:
             tile.draw()
+
         try:
             self.block.draw()
         except AttributeError:
@@ -426,6 +449,10 @@ class Board(Component):
 
             self.block = Block(self.game, randint(0, 6), randint(0, self.size_x - 4))
 
+    def add_to_grid(self, tiles: List[Tile]):
+        for tile in tiles:
+            self.grid[tile.x][tile.y] = tile  # FIXME ????
+
     def handle_bottom_collision(self) -> None:
         """
         Handles bottom collisions; moves the tiles from block.tiles to self.tiles, removes the full rows and
@@ -433,7 +460,8 @@ class Board(Component):
         """
 
         # move tiles from block.tiles to self.tiles and delete the block object
-        self.tiles.extend(self.block.tiles)
+        # self.tiles.extend(self.block.tiles)
+        self.add_to_grid(self.block.tiles)
 
         # remove full rows and move the tiles down
         self.remove_full_rows()
@@ -449,9 +477,14 @@ class Board(Component):
 
         if rows_to_delete:
             # remove full rows
-            self.tiles = [tile for tile in self.tiles if tile.y not in rows_to_delete]
+            for row in rows_to_delete:
+                for column in self.grid:
+                    del column[row]
 
-            # move tiles down
+                    # compensate for the deleted row
+                    column.insert(0, None)
+
+        # update tiles' attributes
         for tile in self.tiles:
             tile.update(0, sum(tile.y < row_idx for row_idx in rows_to_delete))
 
