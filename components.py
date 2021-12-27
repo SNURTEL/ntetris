@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 # from game import Game  # cannot be used - circular import
 from random import randint
 from typing import Tuple, List, Set, Union
-import sys
 
 
 # TODO USE PRIVATE ATTRIBUTES!!!1!!111!1!1ONEONE

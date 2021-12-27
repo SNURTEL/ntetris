@@ -1,6 +1,5 @@
 from __future__ import annotations
 from components import *
-from typing import List, Tuple, Union
 from abc import ABC, abstractmethod
 from copy import copy
 import curses
@@ -18,11 +17,10 @@ class UI:
         # self.size_y, self.size_x = game.screen.getmaxyx()  # TODO dynamic resize
         self.size_x, self.size_y = game.settings.WINDOW_SIZE
 
+        # board
         # this is later called in Game class construction, cannot use board.set_position here, as it would require
         # referencing an object that's currently being initialized
         self.board_position = (27, 2)
-
-        # board
         self.board_frame = Frame(game,
                                  self.board_position[0] - 1,
                                  self.board_position[1] - 1,
@@ -31,21 +29,31 @@ class UI:
                                  curses.color_pair(1),
                                  'Game')
 
+        # stats window
         self.stats_frame = Frame(game, 4, 1, 19, 5,
                                  curses.color_pair(1),
                                  'Stats')
-
-        # score window
-        self.score_title = Text(game, 6, 2, curses.color_pair(1), 'Score')
-        self.level_title = Text(game, 6, 4, curses.color_pair(1), 'Level')
-
-        self.score_value = Text(game, 18, 2, curses.color_pair(1), 'XXX')
-        self.level_value = Text(game, 18, 4, curses.color_pair(1), 'YYY')
+        self.score_titles = Text(game, 6, 2, curses.color_pair(1), 'Score\n\nLevel')
+        self.score_values = Text(game, 18, 2, curses.color_pair(1), 'XXX\n\nYYY')
 
         # next block window
         self.next_frame = Frame(game, 51, 1, 18, 6, curses.color_pair(1), 'Next')
         self.next_block = None
         self.next_block_position = (56, 4)
+
+        # top scores
+        self.top_scores_frame = Frame(game, 4, 7, 19, 12,
+                                      curses.color_pair(1),
+                                      'Stats')
+        self.top_scores_titles = Text(game, 6, 8, curses.color_pair(1), '\n'.join([f"{i}." for i in range(1, 11)]))
+        self.top_scores_values = Text(game, 18, 8, curses.color_pair(1),
+                                           '\n'.join([str(111 * i) for i in reversed(range(1, 10))] + ['000']))
+
+        # controls
+        self.controls_frame = Frame(game, 51, 8, 18, 7, curses.color_pair(1), 'Controls')
+        self.controls_titles = Text(game, 53, 9, curses.color_pair(1), 'Left\nRight\nRotate\nDrop\nQuit')
+        self.controls_keys = Text(game, 66, 9, curses.color_pair(1),
+                                       '←\n→\n↑\n↓\nq')
 
     def set_next_block(self, next_block: Block) -> None:
         """
@@ -75,15 +83,13 @@ class UI:
         self.game.board.draw()
         self.board_frame.draw()
 
-    def draw_score(self):
+    def draw_stats(self):
         """
-        Draws the score window
+        Draws the stats window
         """
         self.stats_frame.draw()
-        self.score_title.draw()
-        self.level_title.draw()
-        self.score_value.draw()
-        self.level_value.draw()
+        self.score_titles.draw()
+        self.score_values.draw()
 
     def draw_next(self):
         """
@@ -91,6 +97,22 @@ class UI:
         """
         self.next_frame.draw()
         self.next_block.draw(*self.next_block_position)
+
+    def draw_top_scores(self):
+        """
+        Draws the top scores window
+        """
+        self.top_scores_frame.draw()
+        self.top_scores_titles.draw()
+        self.top_scores_values.draw()
+
+    def draw_controls(self):
+        """
+        Draws the controls window
+        """
+        self.controls_frame.draw()
+        self.controls_titles.draw()
+        self.controls_keys.draw()
 
 
 class Drawable(ABC):
@@ -192,20 +214,21 @@ class Text(Drawable):
     A class representing a piece of text in the UI
     """
 
-    def __init__(self, game, x_pos, y_pos, color, text):
+    def __init__(self, game, x_pos: int, y_pos: int, color, lines: str):
         """
-        Inits class text
+        Inits class Text
         :param game: A game class instance passed by the game itself
-        :param x_pos: Text's x coordinate
-        :param y_pos: Text's y coordinate
+        :param x_pos: String's x coordinate
+        :param y_pos: String's y coordinate
         :param color: A curses.colorpair-like object defining text's appearance
-        :param text: A string of characters meant to be displayed
+        :param lines: A string meant do be displayd
         """
         super(Text, self).__init__(game, x_pos, y_pos, color)
-        self.text = text
+        self.lines = lines.split(sep='\n')
 
     def draw(self):
         """
-        Draws the text onto the screen
+        Draws the text lines onto the screen
         """
-        self.game.screen.addstr(self.y_position, self.x_position, self.text, self.color)
+        for line_idx in range(len(self.lines)):
+            self.game.screen.addstr(self.y_position + line_idx, self.x_position, self.lines[line_idx], self.color)
