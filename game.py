@@ -1,6 +1,7 @@
 from __future__ import annotations
 import curses
 import time
+import sys
 from settings import Settings
 from components import Board
 from abc import ABC, abstractmethod
@@ -55,8 +56,10 @@ class Active(GameState):
         Reads keyboard input, updates the board and the UI
         """
         key = self.game.screen.getch()
-
-        self.game.board.update(key)
+        if key == 113:
+            sys.exit()
+        else:
+            self.game.board.update(key)
 
     def update_screen(self) -> None:
         """
@@ -66,8 +69,10 @@ class Active(GameState):
         self.game.screen.erase()
 
         self.game.ui.draw_board()
-        self.game.ui.draw_score()
+        self.game.ui.draw_stats()
         self.game.ui.draw_next()
+        self.game.ui.draw_top_scores()
+        self.game.ui.draw_controls()
 
         self.game.screen.refresh()
 
@@ -189,10 +194,19 @@ class Game:
         self.start_time = time.time()
 
         #  main event loop
-        while True:
-            self.state.handle_events()
-            self.state.update_screen()
+        try:
+            while True:
+                try:
+                    self.state.handle_events()
+                    self.state.update_screen()
+                    self.ui.resize()
 
-            self.ui.resize()
+                    self.wait_till_next_tick()
+                except KeyboardInterrupt:
+                    # ignore
+                    continue
+        finally:
+            # on sys.exit
+            curses.endwin()
+            print(':D')
 
-            self.wait_till_next_tick()
