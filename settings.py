@@ -6,8 +6,9 @@ class Settings:
     def __init__(self):
         self._REFRESH_RATE = 30  # hz
         self._BOARD_SIZE = (10, 20)  # x, y
-        self._WINDOW_SIZE = self._BOARD_SIZE
+        self._WINDOW_SIZE = (72, 24)  # x, y
         self._BLOCK_MOVEMENT_PERIOD = 0.2  # s
+        # TODO colors
 
     @property
     def REFRESH_RATE(self):

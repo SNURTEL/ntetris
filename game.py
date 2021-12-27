@@ -4,12 +4,14 @@ import time
 from settings import Settings
 from components import Board
 from abc import ABC, abstractmethod
+from ui import UI
 
 
 class GameState(ABC):
     """
     Composite abstract class used to build GameStates
     """
+
     def __init__(self, game: Game):
         """
         Inits class GameState
@@ -40,15 +42,6 @@ class GameState(ABC):
         """
         pass
 
-    def resize_window(self) -> None:
-        """
-        Resizes the window to dimensions specified in game settings
-        """
-        x, y = self._game.window_size
-        is_resized = curses.is_term_resized(y, x)
-        if is_resized:
-            curses.resizeterm(y, x)
-
 
 class Active(GameState):
     """
@@ -69,9 +62,12 @@ class Active(GameState):
         """
         Draws the board and the UI
         """
+
         self.game.screen.erase()
-        self.resize_window()
-        self.game.board.draw()
+
+        self.game.ui.draw_board()
+        self.game.ui.draw_score()
+        self.game.ui.draw_next()
 
         self.game.screen.refresh()
 
@@ -80,6 +76,7 @@ class Stopped(GameState):
     """
     Stopped state of the game
     """
+
     def handle_events(self) -> None:
         """
         Handles UI navigation, does not update the board
@@ -97,6 +94,7 @@ class Game:
     """
     Main class representing a Tetris game. Settings are loaded from settings.py # TODO update if this changes
     """
+
     def __init__(self, screen: curses.window):
         """
         Inits class game
@@ -115,28 +113,35 @@ class Game:
 
         self._state = self._stopped
 
-        # window
-        self.window_size = self._settings.WINDOW_SIZE
+        # UI
         curses.curs_set(False)
+        self.ui = UI(self)
 
-        # self._screen.idcok(False)  # use if flickering appears
-        # self._screen.idlok(False)
+        self._screen.idcok(False)  # use if flickering appears
+        self._screen.idlok(False)
+
+        # cannot be done in UI class constructior
+        self.board.set_position(*self.ui.board_position)
 
         # timing
         self.start_time = time.time()
         self.period = 1.0 / self.settings.REFRESH_RATE
 
         # color_presets
-        curses.init_pair(11, curses.COLOR_CYAN, curses.COLOR_BLACK)
-        curses.init_pair(12, curses.COLOR_BLUE, curses.COLOR_BLACK)
-        curses.init_color(250, 1000, 500, 0)  # does not work in pycharm terminal
-        curses.init_pair(13, 250, curses.COLOR_BLACK)
-        curses.init_pair(14, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-        curses.init_pair(15, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(16, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
-        curses.init_pair(17, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.use_default_colors()
 
-        curses.init_pair(7, 250, curses.COLOR_BLACK)
+        curses.init_pair(1, curses.COLOR_WHITE, -1)
+
+        curses.init_pair(11, -1, curses.COLOR_CYAN)
+        curses.init_pair(12, -1, curses.COLOR_BLUE)
+        curses.init_color(250, 1000, 500, 0)  # does not work in pycharm terminal
+        curses.init_pair(13, -1, 250)
+        curses.init_pair(14, -1, curses.COLOR_YELLOW)
+        curses.init_pair(15, -1, curses.COLOR_GREEN)
+        curses.init_pair(16, -1, curses.COLOR_MAGENTA)
+        curses.init_pair(17, -1, curses.COLOR_RED)
+
+        curses.init_pair(7, 250, -1)
 
     @property
     def active(self) -> GameState:
@@ -187,5 +192,7 @@ class Game:
         while True:
             self.state.handle_events()
             self.state.update_screen()
+
+            self.ui.resize()
 
             self.wait_till_next_tick()
