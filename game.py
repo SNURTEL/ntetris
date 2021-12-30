@@ -59,7 +59,7 @@ class Active(GameState):
         if key == 113:
             sys.exit()
         else:
-            self._game._board.update(key)
+            self._game.board.update(key)
 
     def update_screen(self) -> None:
         """
@@ -132,25 +132,16 @@ class Game:
         self._start_time = time.time()
         self._period = 1.0 / self._settings.REFRESH_RATE
 
-        # color_presets
+        # load default terminal colors
         curses.use_default_colors()
 
-        # text and UI
-        curses.init_pair(1, curses.COLOR_WHITE, -1)
+        # init custom colors
+        for idx, rgb in self._settings.CUSTOM_COLORS.items():
+            curses.init_color(idx, *rgb)
 
-        # block colors
-        curses.init_pair(11, -1, curses.COLOR_CYAN)
-        curses.init_pair(12, -1, curses.COLOR_BLUE)
-        curses.init_color(250, 1000, 500, 0)  # does not work in pycharm terminal
-        curses.init_pair(13, -1, 250)
-        curses.init_pair(14, -1, curses.COLOR_YELLOW)
-        curses.init_pair(15, -1, curses.COLOR_GREEN)
-        curses.init_pair(16, -1, curses.COLOR_MAGENTA)
-        curses.init_pair(17, -1, curses.COLOR_RED)
-
-        # dotted background
-        curses.init_color(251, 250, 250, 250)
-        curses.init_pair(10, 251, -1)
+        # init color pairs
+        for idx, rgb in self._settings.COLOR_PAIRS.items():
+            curses.init_pair(idx, *rgb)
 
     @property
     def ui(self):

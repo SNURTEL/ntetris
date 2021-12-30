@@ -525,6 +525,7 @@ class Board(Component):
         # for tile in self.tiles:
         #     tile.draw(self._position_x, self._position_y)
 
+        # added dotted background
         for column_idx in range(self._size_x):
             for row_idx in range(self._size_y):
                 field = self._grid[column_idx][row_idx]
