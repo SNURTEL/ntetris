@@ -3,9 +3,10 @@ import curses
 import time
 import sys
 from settings import Settings
-from components import Board
+from components import Board, GameEnded
 from abc import ABC, abstractmethod
 from ui import UI
+from typing import Type
 
 
 class GameState(ABC):
@@ -55,31 +56,34 @@ class Active(GameState):
         """
         Reads keyboard input, updates the board and the UI
         """
-        key = self.game.screen.getch()
-        if key == 113:
-            sys.exit()
-        else:
-            self.game.board.update(key)
+        try:
+            key = self._game.screen.getch()
+            if key == 113:
+                sys.exit()
+            else:
+                self._game.board.update(key)
+        except GameEnded:
+            self._game.switch_to_state(Ended)
 
     def update_screen(self) -> None:
         """
         Draws the board and the UI
         """
 
-        self.game.screen.erase()
+        self._game.screen.erase()
 
-        self.game.ui.draw_board()
-        self.game.ui.draw_stats()
-        self.game.ui.draw_next()
-        self.game.ui.draw_top_scores()
-        self.game.ui.draw_controls()
+        self._game.ui.draw_board()
+        self._game.ui.draw_stats()
+        self._game.ui.draw_next()
+        self._game.ui.draw_top_scores()
+        self._game.ui.draw_controls()
 
-        self.game.screen.refresh()
+        self._game.screen.refresh()
 
 
-class Stopped(GameState):
+class Ended(GameState):
     """
-    Stopped state of the game
+    Ended state of the game
     """
 
     def handle_events(self) -> None:
@@ -92,12 +96,15 @@ class Stopped(GameState):
         """
         Draws the board and the UI
         """
-        print('game stopped')
+        # self._game.screen.erase()
+
+        self._game.ui.draw_game_ended()
+        self._game.screen.refresh()
 
 
 class Game:
     """
-    Main class representing a Tetris game. Settings are loaded from settings.py # TODO update if this changes
+    Main class representing a Tetris game. Settings are loaded from settings.py #
     """
 
     def __init__(self, screen: curses.window):
@@ -114,51 +121,38 @@ class Game:
 
         # managing states
         self._active = Active(self)
-        self._stopped = Stopped(self)
+        self._ended = Ended(self)
 
-        self._state = self._stopped
+        self._state = self._ended
 
         # UI
         curses.curs_set(False)
-        self.ui = UI(self)
+        self._ui = UI(self)
 
         self._screen.idcok(False)  # use if flickering appears
         self._screen.idlok(False)
 
         # cannot be done in UI class constructior
-        self.board.set_position(*self.ui.board_position)
+        self._board.set_position(*self._ui.board_position)
 
         # timing
-        self.start_time = time.time()
-        self.period = 1.0 / self.settings.REFRESH_RATE
+        self._start_time = time.time()
+        self._period = 1.0 / self._settings.REFRESH_RATE
 
-        # color_presets
+        # load default terminal colors
         curses.use_default_colors()
 
-        curses.init_pair(1, curses.COLOR_WHITE, -1)
+        # init custom colors
+        for idx, rgb in self._settings.CUSTOM_COLORS.items():
+            curses.init_color(idx, *rgb)
 
-        curses.init_pair(11, -1, curses.COLOR_CYAN)
-        curses.init_pair(12, -1, curses.COLOR_BLUE)
-        curses.init_color(250, 1000, 500, 0)  # does not work in pycharm terminal
-        curses.init_pair(13, -1, 250)
-        curses.init_pair(14, -1, curses.COLOR_YELLOW)
-        curses.init_pair(15, -1, curses.COLOR_GREEN)
-        curses.init_pair(16, -1, curses.COLOR_MAGENTA)
-        curses.init_pair(17, -1, curses.COLOR_RED)
-
-        curses.init_pair(7, 250, -1)
+        # init color pairs
+        for idx, rgb in self._settings.COLOR_PAIRS.items():
+            curses.init_pair(idx, *rgb)
 
     @property
-    def active(self) -> GameState:
-        return self._active
-
-    @property
-    def stopped(self) -> GameState:
-        return self._stopped
-
-    @property
-    def state(self) -> GameState:
-        return self._state
+    def ui(self):
+        return self._ui
 
     @property
     def settings(self) -> Settings:
@@ -172,36 +166,38 @@ class Game:
     def board(self) -> Board:
         return self._board
 
-    @state.setter
-    def state(self, new: GameState):
-        self._state = new
-
-    def switch_to_state(self, state: GameState) -> None:
+    def switch_to_state(self, state: Type[GameState]) -> None:
         """Switches the game to the given state"""
-        self.state = state
 
-    def wait_till_next_tick(self) -> None:
+        state_mapping = {
+            Active: self._active,
+            Ended: self._ended
+        }
+
+        self._state = state_mapping[state]
+
+    def _wait_till_next_tick(self) -> None:
         """
         Ensures that 1s/refresh rate passes between every event loop iteration
         """
-        time.sleep(self.period - ((time.time() - self.start_time) % self.period))
+        time.sleep(self._period - ((time.time() - self._start_time) % self._period))
 
     def run_game(self) -> None:
         """
         Starts the game
         """
-        self.switch_to_state(self.active)
-        self.start_time = time.time()
+        self.switch_to_state(Active)
+        self._start_time = time.time()
 
         #  main event loop
         try:
             while True:
                 try:
-                    self.state.handle_events()
-                    self.state.update_screen()
-                    self.ui.resize()
+                    self._state.handle_events()
+                    self._state.update_screen()
+                    self._ui.resize()
 
-                    self.wait_till_next_tick()
+                    self._wait_till_next_tick()
                 except KeyboardInterrupt:
                     # ignore
                     continue
@@ -209,4 +205,3 @@ class Game:
             # on sys.exit
             curses.endwin()
             print(':D')
-
