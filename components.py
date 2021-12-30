@@ -19,9 +19,21 @@ class Component(ABC):
         Inits class Component
         :param game: Game instance passed by the game itself
         """
-        self.game = game
-        self.screen = game.screen
-        self.settings = game.settings
+        self._game = game
+        self._screen = game.screen
+        self._settings = game.settings
+
+    @property
+    def game(self):
+        return self._game
+
+    @property
+    def screen(self):
+        return self._screen
+
+    @property
+    def settings(self):
+        return self._settings
 
     @abstractmethod
     def draw(self, *args, **kwargs):
@@ -57,7 +69,23 @@ class Tile(Component):
         super(Tile, self).__init__(game)
         self._chars = '  '
         self._typeface = color
-        self.x, self.y = position
+        self._x, self._y = position
+
+    @property
+    def x(self):
+        return self._x
+
+    @property
+    def y(self):
+        return self._y
+
+    @x.setter
+    def x(self, new_x):
+        self._x = new_x
+
+    @y.setter
+    def y(self, new_y):
+        self._y = new_y
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -65,7 +93,7 @@ class Tile(Component):
         Returns tile's position on the board
         :return: Tile's position on the board
         """
-        return self.x, self.y
+        return self._x, self._y
 
     def draw(self, x_offset, y_offset, *args, **kwargs):
         """
@@ -78,7 +106,7 @@ class Tile(Component):
         :param kwargs: Ignored
         """
         try:
-            self.screen.addstr(self.y + y_offset, 2 * self.x + x_offset, self._chars, self._typeface | curses.A_BOLD)
+            self._screen.addstr(self._y + y_offset, 2 * self._x + x_offset, self._chars, self._typeface | curses.A_BOLD)
         except curses.error:
             pass  # uhhhhhhh this WILL cause errors
 
@@ -88,8 +116,8 @@ class Tile(Component):
         :param x: X offset
         :param y: Y offset
         """
-        self.x += x
-        self.y += y
+        self._x += x
+        self._y += y
 
 
 class BlockPreset(Component):  # NOT the best way to keep presets
@@ -104,7 +132,7 @@ class BlockPreset(Component):  # NOT the best way to keep presets
         """
         super(BlockPreset, self).__init__(game)
         # ugly; block presets
-        self.block_presets = (
+        self._block_presets = (
             #       ####  0 cyan
             [(pos, 0) for pos in range(4)],
             #       #
@@ -126,12 +154,12 @@ class BlockPreset(Component):  # NOT the best way to keep presets
             #       ##   6 red
             [(0, 0), (1, 0), (1, 1), (2, 1)]
         )
-        self.color_presets = (curses.color_pair(11), curses.color_pair(12), curses.color_pair(13), curses.color_pair(
+        self._color_presets = (curses.color_pair(11), curses.color_pair(12), curses.color_pair(13), curses.color_pair(
             14), curses.color_pair(15), curses.color_pair(16), curses.color_pair(17))
 
         # cyan block has a different pivot point
-        self.pivot_point_presets = dict.fromkeys(list(range(1, 7)), [1 + x, 0])
-        self.pivot_point_presets[0] = [1 + x, 1]
+        self._pivot_point_presets = dict.fromkeys(list(range(1, 7)), [1 + x, 0])
+        self._pivot_point_presets[0] = [1 + x, 1]
 
     @abstractmethod
     def update(self, *args, **kwargs) -> None:
@@ -163,11 +191,23 @@ class Block(BlockPreset):
         :param block_id: Indicates which block to spawn, block presets are stored in the superclass
         """
         super(Block, self).__init__(game, block_id, 0)
-        self.id = block_id
-        self.tiles = [Tile(self.game, (position[0], position[1]), self.color_presets[block_id])
-                      for position in self.block_presets[block_id]]
+        self._id = block_id
+        self._tiles = [Tile(self.game, (position[0], position[1]), self._color_presets[block_id])
+                       for position in self._block_presets[block_id]]
 
-        self.pivot_point = self.pivot_point_presets[block_id]
+        self._pivot_point = self._pivot_point_presets[block_id]
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def tiles(self):
+        return self._tiles
+
+    @property
+    def pivot_point(self):
+        return self._pivot_point
 
     def update(self, x: int, y: int):
         """
@@ -175,11 +215,11 @@ class Block(BlockPreset):
         :param x: X offset
         :param y: Y offset
         """
-        for tile in self.tiles:
+        for tile in self._tiles:
             tile.update(x, y)
 
-        self.pivot_point[0] += x
-        self.pivot_point[1] += y
+        self._pivot_point[0] += x
+        self._pivot_point[1] += y
 
     def set_position(self, x: int, y: int) -> None:
         """
@@ -187,14 +227,14 @@ class Block(BlockPreset):
         :param x: Target x axis position of the block's bounding box's upper left corner
         :param y: Target x axis position of the block's bounding box's upper left corner
         """
-        current_x = min([tile.x for tile in self.tiles])
-        current_y = min([tile.y for tile in self.tiles])
-        for tile in self.tiles:
+        current_x = min([tile.x for tile in self._tiles])
+        current_y = min([tile.y for tile in self._tiles])
+        for tile in self._tiles:
             tile.x -= current_x - x
             tile.y -= current_y - y
 
-        self.pivot_point[0] -= current_x - x
-        self.pivot_point[1] -= current_y - y
+        self._pivot_point[0] -= current_x - x
+        self._pivot_point[1] -= current_y - y
 
     def draw(self, x_offset: int, y_offset: int, *args, **kwargs):
         """
@@ -204,7 +244,7 @@ class Block(BlockPreset):
         :param args: Ignored
         :param kwargs: Ignored
         """
-        for tile in self.tiles:
+        for tile in self._tiles:
             tile.draw(x_offset, y_offset)
 
     def rotate(self, direction: int) -> None:
@@ -216,7 +256,7 @@ class Block(BlockPreset):
         new_positions = self._get_rotated_positions(direction)
 
         # update the tiles with generated positions
-        for tile_pos in zip(self.tiles, new_positions):
+        for tile_pos in zip(self._tiles, new_positions):
             tile_pos[0].x, tile_pos[0].y = tile_pos[1]
 
     def _get_rotated_positions(self, direction: int) -> List[Tuple[int, int]]:
@@ -226,15 +266,15 @@ class Block(BlockPreset):
         :param direction: Indicates the direction, 1 for clockwise, -1 for counter-clockwise
         :return: List of (x, y) pairs
         """
-        p_x, p_y = self.pivot_point
+        p_x, p_y = self._pivot_point
 
         # cyan block rotates in a different way
-        if self.id == 0:
+        if self._id == 0:
             return [((p_y - tile.y) * direction + p_x, (p_x - tile.x) * direction + p_y)
-                    for tile in self.tiles]
+                    for tile in self._tiles]
         else:
             return [((p_y - tile.y) * direction + p_x, (-p_x + tile.x) * direction + p_y)
-                    for tile in self.tiles]
+                    for tile in self._tiles]
 
     def validate_rotation(self, direction: int) -> bool:
         """
@@ -244,16 +284,16 @@ class Block(BlockPreset):
         of the board, False if it will
         """
         # yellow block does not rotate
-        if self.id == 3:
+        if self._id == 3:
             return False
 
         # get expected positions
         fields_to_check = self._get_rotated_positions(direction)
 
         # check if would overlap with other tiles or be placed out of the board
-        return all(not self.game.board.get_tile(x, y)
-                   and 0 <= x < self.game.board.size_x
-                   and 0 <= y < self.game.board.size_y
+        return all(not self._game.board.get_tile(x, y)
+                   and 0 <= x < self._game.board.size_x
+                   and 0 <= y < self._game.board.size_y
                    for x, y in fields_to_check)
 
     def check_side_collisions(self, x: int) -> bool:
@@ -280,7 +320,7 @@ class Block(BlockPreset):
         :param y: Y offset
         :return: A set of (x, y) pairs
         """
-        return [(tile.x + x, tile.y + y) for tile in self.tiles]
+        return [(tile.x + x, tile.y + y) for tile in self._tiles]
 
     def _check_block_collisions(self, fields_to_check: List[Tuple[int, int]]) -> bool:
         """
@@ -288,7 +328,7 @@ class Block(BlockPreset):
         :param fields_to_check: (x, y) pairs to be checked if they contain a tile
         :return: True if at least one of fields_to_check contains a tile, False if it does not
         """
-        return any(bool(self.game.board.get_tile(x, y)) for x, y in fields_to_check)
+        return any(bool(self._game.board.get_tile(x, y)) for x, y in fields_to_check)
 
     def _check_bottom_edge(self, fields_to_check: List[Tuple[int, int]]) -> bool:
         """
@@ -296,7 +336,7 @@ class Block(BlockPreset):
         :param fields_to_check: (x, y) pairs to be checked if they are located below board's bottom edge
         :return: True if the block sits at the board's bottom edge, false if it does not
         """
-        return any(self.game.board.get_tile(x, y, True) is True for x, y in fields_to_check)
+        return any(self._game.board.get_tile(x, y, True) is True for x, y in fields_to_check)
 
     def _check_sides(self, fields_to_check: List[Tuple[int, int]]) -> bool:
         """
@@ -304,7 +344,7 @@ class Block(BlockPreset):
         :param fields_to_check: (x, y) pairs to be checked if any of them is not located on the board
         :return: True if the block is located next to the board's edge, False if it's not
         """
-        return any(field[0] < 0 or field[0] == self.game.board.size_x for field in fields_to_check)
+        return any(field[0] < 0 or field[0] == self._game.board.size_x for field in fields_to_check)
 
 
 class BoardState(ABC):
@@ -395,25 +435,49 @@ class Board(Component):
         super(Board, self).__init__(game)
 
         # UI position
-        self.position_x, self.position_y = (0, 0)
+        self._position_x, self._position_y = (0, 0)
 
         # board size
-        self.size_x = self.settings.BOARD_SIZE[0]
-        self.size_y = self.settings.BOARD_SIZE[1]
+        self._size_x = self.settings.BOARD_SIZE[0]
+        self._size_y = self.settings.BOARD_SIZE[1]
 
         # tiles
-        self.grid = [[None for _ in range(self.size_y)] for _ in range(self.size_x)]
-        self.block = None
-        self.next_block = Block(self.game, randint(0, 6))
+        self._grid = [[None for _ in range(self._size_y)] for _ in range(self._size_x)]
+        self._block = None
+        self._next_block = Block(self.game, randint(0, 6))
 
         # timing
-        self.block_move_period = game.settings.BLOCK_MOVEMENT_PERIOD
-        self.last_block_move = time.time()
+        self._block_move_period = game.settings.BLOCK_MOVEMENT_PERIOD
+        self._last_block_move = time.time()
 
         # event handling
-        self.soft_drop = SoftDrop()
-        self.hard_drop = HardDrop()
-        self.state = SoftDrop
+        self._soft_drop = SoftDrop()
+        self._hard_drop = HardDrop()
+        self._state = SoftDrop
+
+    @property
+    def block(self):
+        return self._block
+
+    @property
+    def last_block_move(self):
+        return self._last_block_move
+
+    @property
+    def block_move_period(self):
+        return self._block_move_period
+
+    @property
+    def size_x(self):
+        return self._size_x
+
+    @property
+    def size_y(self):
+        return self._size_y
+
+    @last_block_move.setter
+    def last_block_move(self, new):
+        self._last_block_move = new
 
     @property
     def tile_positions(self) -> List[Tuple[int, int]]:
@@ -430,7 +494,7 @@ class Board(Component):
         :return: A list of all Tile instances in self.tiles
         """
         # this will never return None, type checking errors should be ignored
-        return [t for column in self.grid for t in column if t]
+        return [t for column in self._grid for t in column if t]
 
     def set_position(self, x: int, y: int) -> None:
         """
@@ -438,8 +502,8 @@ class Board(Component):
         :param x: X coordinate
         :param y: Y coordinate
         """
-        self.position_x = x
-        self.position_y = y
+        self._position_x = x
+        self._position_y = y
 
     def get_tile(self, x, y, default=None) -> Union[Tile, None]:
         """
@@ -450,7 +514,7 @@ class Board(Component):
         :return: A Tile instance or None / default
         """
         try:
-            return self.grid[x][y]
+            return self._grid[x][y]
         except IndexError:
             return default
 
@@ -458,11 +522,20 @@ class Board(Component):
         """
         Draws the board
         """
-        for tile in self.tiles:
-            tile.draw(self.position_x, self.position_y)
+        # for tile in self.tiles:
+        #     tile.draw(self._position_x, self._position_y)
+
+        for column_idx in range(self._size_x):
+            for row_idx in range(self._size_y):
+                field = self._grid[column_idx][row_idx]
+                if field:
+                    field.draw(self._position_x, self._position_y)
+                else:
+                    self._screen.addch(row_idx + self._position_y, 2 * column_idx + self._position_x + 1, '.',
+                                        curses.color_pair(10) | curses.A_BOLD)
 
         try:
-            self.block.draw(self.position_x, self.position_y)
+            self._block.draw(self._position_x, self._position_y)
         except AttributeError:
             pass
 
@@ -472,33 +545,33 @@ class Board(Component):
         :param key: Key code passed by curses.getch
         """
 
-        if self.block:  # or try
+        if self._block:  # or try
             # switch do hard_drop on arrow down
             if key == 258:
-                self.state = self.hard_drop
+                self._state = self._hard_drop
             # else:
             #     self.state = self.soft_drop  # FIXME delayed response
 
             # handle user input, move the block, handle collisions
-            self.state.update(self, key)
+            self._state.update(self, key)
 
         else:  # or except AttributeError
             # spawn a new block
-            self.state = self.soft_drop
+            self._state = self._soft_drop
 
-            self.spawn_block(self.next_block)
-            self.next_block = Block(self.game, randint(0, 6))
+            self._spawn_block(self._next_block)
+            self._next_block = Block(self._game, randint(0, 6))
 
-            self.game.ui.set_next_block(self.next_block)
+            self._game.ui.set_next_block(self._next_block)
 
-    def spawn_block(self, block: Block):
-        self.block = block
-        self.block.set_position(randint(0, 6), 0)
+    def _spawn_block(self, block: Block):
+        self._block = block
+        self._block.set_position(randint(0, 6), 0)
         # self.block.update(randint(0, 6), 0)
 
-    def add_to_grid(self, tiles: List[Tile]):
+    def _add_to_grid(self, tiles: List[Tile]):
         for tile in tiles:
-            self.grid[tile.x][tile.y] = tile  # FIXME ????
+            self._grid[tile.x][tile.y] = tile  # FIXME ????
 
     def handle_bottom_collision(self) -> None:
         """
@@ -507,25 +580,25 @@ class Board(Component):
         """
 
         # move tiles from block.tiles to self.tiles and delete the block object
-        self.add_to_grid(self.block.tiles)
+        self._add_to_grid(self._block.tiles)
 
         # remove full rows and move the tiles down
-        self.remove_full_rows()
+        self._remove_full_rows()
 
         # delete the block
-        self.block = None  # or del self.block
+        self._block = None  # or del self.block
 
-    def remove_full_rows(self):
+    def _remove_full_rows(self):
         """
         Checks if there are any full rows on the board and removes them
         """
-        rows_to_delete = self.get_full_rows_idx({tile.y for tile in self.block.tiles})
+        rows_to_delete = self._get_full_rows_idx({tile.y for tile in self._block.tiles})
 
         if rows_to_delete:
 
             # remove full rows
             for row in rows_to_delete:
-                for column in self.grid:
+                for column in self._grid:
                     del column[row]
 
                     # compensate for the deleted row
@@ -535,7 +608,7 @@ class Board(Component):
         for tile in self.tiles:
             tile.update(0, sum(tile.y < row_idx for row_idx in rows_to_delete))
 
-    def get_full_rows_idx(self, to_check: Set[int]) -> List[int]:
+    def _get_full_rows_idx(self, to_check: Set[int]) -> List[int]:
         """
         Checks given rows and returns their indexes if they are full
         :param to_check: Indexes of rows that should be checked
@@ -546,4 +619,4 @@ class Board(Component):
         tile_y = [tile.y for tile in self.tiles]
 
         # count the occurances and return the indexes
-        return [idx for idx in to_check if tile_y.count(idx) == self.size_x]
+        return [idx for idx in to_check if tile_y.count(idx) == self._size_x]
