@@ -7,7 +7,9 @@ from random import randint
 from typing import Tuple, List, Set, Union
 
 
-# TODO USE PRIVATE ATTRIBUTES!!!1!!111!1!1ONEONE
+class GameEnded(Exception):
+    pass
+
 
 class Component(ABC):
     """
@@ -579,6 +581,9 @@ class Board(Component):
         Handles bottom collisions; moves the tiles from block.tiles to self.tiles, removes the full rows and
         deletes the block
         """
+
+        if any(tile.y == 0 for tile in self.tiles):
+            raise GameEnded
 
         # move tiles from block.tiles to self.tiles and delete the block object
         self._add_to_grid(self._block.tiles)

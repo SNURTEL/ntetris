@@ -11,7 +11,7 @@ class Settings:
         self._REFRESH_RATE = 30  # hz
         self._BOARD_SIZE = (10, 20)  # x, y
         self._WINDOW_SIZE = (72, 24)  # x, y
-        self._BLOCK_MOVEMENT_PERIOD = 0.2  # s
+        self._BLOCK_MOVEMENT_PERIOD = 0.45  # s
 
         self._CUSTOM_COLORS = {250: (1000, 500, 0),  # orange
                                251: (250, 250, 250)}  # background

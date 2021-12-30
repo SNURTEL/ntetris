@@ -3,9 +3,10 @@ import curses
 import time
 import sys
 from settings import Settings
-from components import Board
+from components import Board, GameEnded
 from abc import ABC, abstractmethod
 from ui import UI
+from typing import Type
 
 
 class GameState(ABC):
@@ -55,11 +56,14 @@ class Active(GameState):
         """
         Reads keyboard input, updates the board and the UI
         """
-        key = self._game.screen.getch()
-        if key == 113:
-            sys.exit()
-        else:
-            self._game.board.update(key)
+        try:
+            key = self._game.screen.getch()
+            if key == 113:
+                sys.exit()
+            else:
+                self._game.board.update(key)
+        except GameEnded:
+            self._game.switch_to_state(Ended)
 
     def update_screen(self) -> None:
         """
@@ -77,9 +81,9 @@ class Active(GameState):
         self._game.screen.refresh()
 
 
-class Stopped(GameState):
+class Ended(GameState):
     """
-    Stopped state of the game
+    Ended state of the game
     """
 
     def handle_events(self) -> None:
@@ -92,12 +96,15 @@ class Stopped(GameState):
         """
         Draws the board and the UI
         """
-        print('game stopped')
+        # self._game.screen.erase()
+
+        self._game.ui.draw_game_ended()
+        self._game.screen.refresh()
 
 
 class Game:
     """
-    Main class representing a Tetris game. Settings are loaded from settings.py # TODO update if this changes
+    Main class representing a Tetris game. Settings are loaded from settings.py #
     """
 
     def __init__(self, screen: curses.window):
@@ -114,9 +121,9 @@ class Game:
 
         # managing states
         self._active = Active(self)
-        self._stopped = Stopped(self)
+        self._ended = Ended(self)
 
-        self._state = self._stopped
+        self._state = self._ended
 
         # UI
         curses.curs_set(False)
@@ -159,9 +166,15 @@ class Game:
     def board(self) -> Board:
         return self._board
 
-    def _switch_to_state(self, state: GameState) -> None:
+    def switch_to_state(self, state: Type[GameState]) -> None:
         """Switches the game to the given state"""
-        self._state = state
+
+        state_mapping = {
+            Active: self._active,
+            Ended: self._ended
+        }
+
+        self._state = state_mapping[state]
 
     def _wait_till_next_tick(self) -> None:
         """
@@ -173,7 +186,7 @@ class Game:
         """
         Starts the game
         """
-        self._switch_to_state(self._active)
+        self.switch_to_state(Active)
         self._start_time = time.time()
 
         #  main event loop
