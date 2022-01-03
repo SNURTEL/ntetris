@@ -535,7 +535,7 @@ class Board(Component):
                     field.draw(self._position_x, self._position_y)
                 else:
                     self._screen.addch(row_idx + self._position_y, 2 * column_idx + self._position_x + 1, '.',
-                                        curses.color_pair(10) | curses.A_BOLD)
+                                       curses.color_pair(10) | curses.A_BOLD)
 
         try:
             self._block.draw(self._position_x, self._position_y)
@@ -552,8 +552,8 @@ class Board(Component):
             # switch do hard_drop on arrow down
             if key == 258:
                 self._state = self._hard_drop
-            # else:
-            #     self.state = self.soft_drop  # FIXME delayed response
+            else:
+                self._state = self._soft_drop  # FIXME delayed response - should react to a key down event
 
             # handle user input, move the block, handle collisions
             self._state.update(self, key)

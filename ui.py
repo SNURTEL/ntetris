@@ -59,7 +59,7 @@ class UI:
 
         # game ended
         msg = 'Game ended'
-        self._game_ended = Text(self._game, (self._size_x - len(msg))//2, (self._size_y - 1)//2, curses.color_pair(1), msg)
+        self._game_ended = Text(self._game, (self._size_x - len(msg))//2 + 1, (self._size_y - 1)//2, curses.color_pair(1), msg)
 
     @property
     def board_position(self):
