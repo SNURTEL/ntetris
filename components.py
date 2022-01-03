@@ -414,13 +414,14 @@ class HardDrop(BoardState):
         :param board: Board class instance passed by the board itself
         :param key: Ignored
         """
-        if board.block.check_bottom_collisions():
-            # handle bottom collisions
-            board.handle_bottom_collision()
-        else:
-            # move the block down
-            board.block.update(0, 1)
-            board.last_block_move = time.time()
+        if (time.time() - board.last_block_move) > board.game.period:  # TODO rename this
+            if board.block.check_bottom_collisions():
+                # handle bottom collisions
+                board.handle_bottom_collision()
+            else:
+                # move the block down
+                board.block.update(0, 1)
+                board.last_block_move = time.time()
 
 
 class Board(Component):
@@ -551,9 +552,10 @@ class Board(Component):
         if self._block:  # or try
             # switch do hard_drop on arrow down
             if key == 258:
+                self._game.screen.refresh()
                 self._state = self._hard_drop
-            else:
-                self._state = self._soft_drop  # FIXME delayed response - should react to a key down event
+            elif key == 259:
+                self._state = self._soft_drop  # FIXME - curses keeps spamming -1 until a certain amount of time passes
 
             # handle user input, move the block, handle collisions
             self._state.update(self, key)

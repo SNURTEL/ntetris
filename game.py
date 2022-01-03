@@ -112,10 +112,16 @@ class Game:
         Inits class game
         :param screen: curses.window instance passed by the wrapper
         """
+
+        curses.raw()
+
+
+
         # components
         self._settings = Settings()
         self._screen = screen
         self._screen.timeout(0)
+
 
         self._board = Board(self)
 
@@ -132,12 +138,13 @@ class Game:
         self._screen.idcok(False)  # use if flickering appears
         self._screen.idlok(False)
 
-        # cannot be done in UI class constructior
+        # cannot be done in UI class constructor
         self._board.set_position(*self._ui.board_position)
 
         # timing
         self._start_time = time.time()
         self._period = 1.0 / self._settings.REFRESH_RATE
+        self._last_screen_update = time.time()
 
         # load default terminal colors
         curses.use_default_colors()
@@ -165,6 +172,10 @@ class Game:
     @property
     def board(self) -> Board:
         return self._board
+
+    @property
+    def period(self):
+        return self._period
 
     def switch_to_state(self, state: Type[GameState]) -> None:
         """Switches the game to the given state"""
@@ -194,10 +205,13 @@ class Game:
             while True:
                 try:
                     self._state.handle_events()
-                    self._state.update_screen()
-                    self._ui.resize()
 
-                    self._wait_till_next_tick()
+                    if (time.time() - self._last_screen_update) > self.period:
+                        self._state.update_screen()
+                        self._ui.resize()
+                        self._last_screen_update = time.time()
+
+                    # self._wait_till_next_tick()  # FIXME make sure this is compensated
                 except KeyboardInterrupt:
                     # ignore
                     continue
