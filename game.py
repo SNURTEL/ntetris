@@ -78,6 +78,10 @@ class Active(GameState):
         self._game.ui.draw_top_scores()
         self._game.ui.draw_controls()
 
+        # key = self._game.screen.getch()
+        # self._game.screen.addstr(0, 0, str(key), curses.color_pair(1))
+        # self._game.screen.refresh()
+
         self._game.screen.refresh()
 
 
@@ -90,7 +94,10 @@ class Ended(GameState):
         """
         Handles UI navigation, does not update the board
         """
-        pass  # call update method on every component
+        key = self._game.screen.getch()
+
+        if key == 113:
+            sys.exit()
 
     def update_screen(self) -> None:
         """
@@ -113,7 +120,7 @@ class Game:
         :param screen: curses.window instance passed by the wrapper
         """
 
-        curses.raw()
+
 
 
 
@@ -121,6 +128,7 @@ class Game:
         self._settings = Settings()
         self._screen = screen
         self._screen.timeout(0)
+        curses.cbreak()
 
 
         self._board = Board(self)
@@ -211,7 +219,6 @@ class Game:
                         self._ui.resize()
                         self._last_screen_update = time.time()
 
-                    # self._wait_till_next_tick()  # FIXME make sure this is compensated
                 except KeyboardInterrupt:
                     # ignore
                     continue
