@@ -8,6 +8,9 @@ from typing import Tuple, List, Set, Union
 
 
 class GameEnded(Exception):
+    """
+    A custom exception indicating that the game has ended
+    """
     pass
 
 
@@ -74,19 +77,19 @@ class Tile(Component):
         self._x, self._y = position
 
     @property
-    def x(self):
+    def x(self) -> int:
         return self._x
 
     @property
-    def y(self):
+    def y(self) -> int:
         return self._y
 
     @x.setter
-    def x(self, new_x):
+    def x(self, new_x: int) -> None:
         self._x = new_x
 
     @y.setter
-    def y(self, new_y):
+    def y(self, new_y: int) -> None:
         self._y = new_y
 
     @property
@@ -97,7 +100,7 @@ class Tile(Component):
         """
         return self._x, self._y
 
-    def draw(self, x_offset, y_offset, *args, **kwargs):
+    def draw(self, x_offset: int, y_offset: int, *args, **kwargs):
         """
         Draws the tile onto the screen, offsetting it by a given vector. Tiles are represented by two empty characters
         with a solid background places next to each other in order to correct for terminal font's rectangular glyph
@@ -201,25 +204,33 @@ class Block(BlockPreset):
         self._points = 0
 
     @property
-    def points(self):
+    def points(self) -> int:
         return self._points
 
     @property
-    def id(self):
+    def id(self) -> int:
         return self._id
 
     @property
-    def tiles(self):
+    def tiles(self) -> List[Tile]:
         return self._tiles
 
     @property
-    def pivot_point(self):
+    def tile_positions(self) -> List[Tuple[int, int]]:
+        return [(tile.x, tile.y) for tile in self._tiles]
+
+    @property
+    def pivot_point(self) -> Tuple[int, int]:
         return self._pivot_point
 
-    def add_points(self, n: int):
+    def add_points(self, n: int) -> None:
+        """
+        Increases block's points
+        :param n: number of points to be added
+        """
         self._points += n
 
-    def update(self, x: int, y: int):
+    def update(self, x: int, y: int) -> None:
         """
         Updated the block's position by a given offset
         :param x: X offset
@@ -234,8 +245,8 @@ class Block(BlockPreset):
     def set_position(self, x: int, y: int) -> None:
         """
         Overrides block's position
-        :param x: Target x axis position of the block's bounding box's upper left corner
-        :param y: Target x axis position of the block's bounding box's upper left corner
+        :param x: Target x-axis position of the block's bounding box's upper left corner
+        :param y: Target y-axis position of the block's bounding box's upper left corner
         """
         current_x = min([tile.x for tile in self._tiles])
         current_y = min([tile.y for tile in self._tiles])
@@ -300,7 +311,15 @@ class Block(BlockPreset):
         # get expected positions
         fields_to_check = self._get_rotated_positions(direction)
 
-        # check if would overlap with other tiles or be placed out of the board
+        # check if the block would overlap with other tiles or be placed out of the board
+        return self.validate_position(fields_to_check)
+
+    def validate_position(self, fields_to_check: List[Tuple[int, int]]) -> bool:
+        """
+        Checks if any of the given fields overlaps with a block or is out of board's bounds
+        :param fields_to_check: (x, y) pairs to be ckecked
+        :return: Whether any of the given fields overlaps with a block or is out of board's bounds
+        """
         return all(not self._game.board.get_tile(x, y)
                    and 0 <= x < self._game.board.size_x
                    and 0 <= y < self._game.board.size_y
@@ -400,7 +419,8 @@ class Falling(BoardState):
             board.block.rotate(1)
 
         # update vertical position every board.block_move_period
-        if (time.time() - board.last_block_move) > board.block_move_period:
+        if (time.time() - board.last_block_move) > board.block_move_period and \
+                not board.block.check_bottom_collisions():
             board.block.update(0, 1)
             board.last_block_move = time.time()
 
@@ -417,21 +437,27 @@ class SoftDrop(BoardState):
         :param board: Board class instance passed by the board itself
         :param key: Ignored
         """
-        if (time.time() - board.last_block_move) > board.game.period:  # TODO rename this
+        if (time.time() - board.last_block_move) > board.game.period and not board.block.check_bottom_collisions():  # TODO rename this
             board.block.update(0, 1)
             board.last_block_move = time.time()
             board.block.add_points(1)
 
 
 class HardDrop(BoardState):
-
+    """
+    Game state handling events if the block is being hard dropped
+    """
     @staticmethod
     def update(board: Board, key=None):
+        """
+        Moves the block down and adds points until it hits an obstacle
+        :param board: A Board class instance passed by the board itself
+        :param key: Ignored
+        """
         while not board.block.check_bottom_collisions():
             board.block.update(0, 1)
             board.last_block_move = time.time()
             board.block.add_points(2)
-        # board.handle_bottom_collision()
 
 
 class Board(Component):
@@ -442,7 +468,7 @@ class Board(Component):
     def __init__(self, game):
         """
         Inits class Board
-        Board dimensions are extracted from game's settings
+        Dimensions are extracted from game's settings
         :param game: Game instance passed by the game itself
         """
         super(Board, self).__init__(game)
@@ -460,7 +486,7 @@ class Board(Component):
         self._next_block = Block(self.game, randint(0, 6))
 
         # timing
-        self._block_move_period = game.settings.BLOCK_MOVEMENT_PERIOD
+        self._block_move_period = game.settings.BLOCK_MOVEMENT_PERIODS[0]
         self._last_block_move = time.time()
 
         # event handling
@@ -480,6 +506,10 @@ class Board(Component):
     @property
     def block_move_period(self):
         return self._block_move_period
+
+    @block_move_period.setter
+    def block_move_period(self, new: float):
+        self._block_move_period = new
 
     @property
     def size_x(self):
@@ -521,7 +551,7 @@ class Board(Component):
 
     def get_tile(self, x, y, default=None) -> Union[Tile, None]:
         """
-        Similat to dict's method .get, tries to return the tile located at (x, y), returns default if there's none
+        Similar to Dict type's method .get, tries to return the tile located at (x, y), returns default if there's none
         :param x: Tile's x coordinate
         :param y: Tile's y coordinate
         :param default: Value to be returned if there's no tile at (x, y)
@@ -536,10 +566,7 @@ class Board(Component):
         """
         Draws the board
         """
-        # for tile in self.tiles:
-        #     tile.draw(self._position_x, self._position_y)
-
-        # added dotted background
+        # TODO maybe use enum?
         for column_idx in range(self._size_x):
             for row_idx in range(self._size_y):
                 field = self._grid[column_idx][row_idx]
@@ -559,6 +586,7 @@ class Board(Component):
         Controls tiles behavior
         :param key: Key code passed by curses.getch
         """
+        # a.k.a. "The Great Mess"
 
         if self._block:
             # switch do soft_drop on arrow down press
@@ -568,21 +596,21 @@ class Board(Component):
                 elif key == 32:
                     self._state = self._hard_drop
                 # revert to falling on release
-                else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes
+                else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes - use keyboard or pynput
                     self._state = self._falling
 
                 # handle user input, move the block, handle collisions aaa
                 self._state.update(self, key)
 
-            # handle collisions after a certain amount of time
-            elif (time.time() - self.last_block_move) > self.block_move_period or self._state == self._soft_drop:
+            # handle collisions after a certain amount of time or if soft dropping
+            elif (time.time() - self.last_block_move) > self.block_move_period * 0.4:
                 self.handle_bottom_collision()
 
             # update the block if on top of another block
             elif self._state != self._hard_drop:
                 self._state.update(self, key)
 
-            # pass if hard_drop and collision detected
+            # pass if in soft_drop / hard_drop and a collision is detected
 
         else:
             # spawn a new block
@@ -593,23 +621,30 @@ class Board(Component):
 
             self._game.ui.set_next_block(self._next_block)
 
-    def _spawn_block(self, block: Block):
+    def _spawn_block(self, block: Block) -> None:
+        """
+        Places the given block on the board
+        :param block: A Block class instance, pre-generated for displaying in the UI
+        """
         self._block = block
-        self._block.set_position(randint(0, 6), 0)
+        self._block.set_position(randint(3, 5), 0)
+        if not self._block.validate_position(self._block.tile_positions):
+            raise GameEnded
         # self.block.update(randint(0, 6), 0)
 
-    def _add_to_grid(self, tiles: List[Tile]):
+    def _add_to_grid(self, tiles: List[Tile]) -> None:
+        """
+        Adds tiles to grid at their locations
+        :param tiles: A list of tiles
+        """
         for tile in tiles:
-            self._grid[tile.x][tile.y] = tile  # FIXME ????
+            self._grid[tile.x][tile.y] = tile  # FIXME pycharm u ok????
 
     def handle_bottom_collision(self) -> None:
         """
         Handles bottom collisions; moves the tiles from block.tiles to self.tiles, removes the full rows and
         deletes the block
         """
-
-        if any(tile.y == 0 for tile in self.tiles):
-            raise GameEnded
 
         # move tiles from block.tiles to self.tiles and delete the block object
         self._add_to_grid(self._block.tiles)
@@ -619,10 +654,18 @@ class Board(Component):
         self._remove_full_rows(rows_to_delete)
 
         # add points
-        # 100 single, 300 double, 500 triple, 800 tetris
+        # 100 single, 300 double, 500 triple, 800 tetris  # *(level+1)
         if rows_to_delete:
-            self._game.add_points(100 * ((2 * len(rows_to_delete) - 1 + int(len(rows_to_delete) == 4))))
+            self._game.add_points(
+                (100 * (2 * len(rows_to_delete) - 1 + int(len(rows_to_delete) == 4)))*(self._game.level + 1))
         self._game.add_points(self._block.points)
+
+        # add cleared lines to counter
+        self._game.add_lines(len(rows_to_delete))
+
+        # increment level
+        if self._game.cleared_lines >= 10 * (self._game.level + 1):
+            self.game.level_up()
 
         # delete the block
         self._block = None  # or del self.block
@@ -634,7 +677,7 @@ class Board(Component):
         if rows_to_delete:
 
             # remove full rows
-            for row in rows_to_delete:
+            for row in sorted(rows_to_delete):
                 for column in self._grid:
                     del column[row]
 
@@ -655,5 +698,5 @@ class Board(Component):
         # build a list of tile.y coordinates
         tile_y = [tile.y for tile in self.tiles]
 
-        # count the occurances and return the indexes
+        # count the occurrences and return the indexes
         return [idx for idx in to_check if tile_y.count(idx) == self._size_x]
