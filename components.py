@@ -569,7 +569,7 @@ class Board(Component):
                 else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes
                     self._state = self._falling
 
-                # handle user input, move the block, handle collisions
+                # handle user input, move the block, handle collisions aaa
                 self._state.update(self, key)
 
             # handle collisions after a certain amount of time
