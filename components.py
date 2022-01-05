@@ -420,6 +420,7 @@ class SoftDrop(BoardState):
         if (time.time() - board.last_block_move) > board.game.period:  # TODO rename this
             board.block.update(0, 1)
             board.last_block_move = time.time()
+            board.block.add_points(1)
 
 
 class HardDrop(BoardState):
@@ -429,6 +430,7 @@ class HardDrop(BoardState):
         while not board.block.check_bottom_collisions():
             board.block.update(0, 1)
             board.last_block_move = time.time()
+            board.block.add_points(2)
         # board.handle_bottom_collision()
 
 
@@ -573,7 +575,7 @@ class Board(Component):
                 self._state.update(self, key)
 
             # handle collisions after a certain amount of time
-            elif (time.time() - self.last_block_move) > self.block_move_period:
+            elif (time.time() - self.last_block_move) > self.block_move_period or self._state == self._soft_drop:
                 self.handle_bottom_collision()
 
             # update the block if on top of another block
@@ -613,17 +615,22 @@ class Board(Component):
         self._add_to_grid(self._block.tiles)
 
         # remove full rows and move the tiles down
-        self._remove_full_rows()
+        rows_to_delete = self._get_full_rows_idx({tile.y for tile in self._block.tiles})
+        self._remove_full_rows(rows_to_delete)
+
+        # add points
+        # 100 single, 300 double, 500 triple, 800 tetris
+        if rows_to_delete:
+            self._game.add_points(100 * ((2 * len(rows_to_delete) - 1 + int(len(rows_to_delete) == 4))))
+        self._game.add_points(self._block.points)
 
         # delete the block
         self._block = None  # or del self.block
 
-    def _remove_full_rows(self):
+    def _remove_full_rows(self, rows_to_delete: List[int]):
         """
         Checks if there are any full rows on the board and removes them
         """
-        rows_to_delete = self._get_full_rows_idx({tile.y for tile in self._block.tiles})
-
         if rows_to_delete:
 
             # remove full rows

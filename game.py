@@ -120,18 +120,16 @@ class Game:
         :param screen: curses.window instance passed by the wrapper
         """
 
-
-
-
-
         # components
         self._settings = Settings()
         self._screen = screen
         self._screen.timeout(0)
-        curses.cbreak()
-
-
+        curses.cbreak()  # does nothing
         self._board = Board(self)
+
+        # scoring
+        self._level = 0
+        self._points = 0
 
         # managing states
         self._active = Active(self)
@@ -166,6 +164,14 @@ class Game:
             curses.init_pair(idx, *rgb)
 
     @property
+    def points(self):
+        return self._points
+
+    @property
+    def level(self):
+        return self._level
+
+    @property
     def ui(self):
         return self._ui
 
@@ -184,6 +190,9 @@ class Game:
     @property
     def period(self):
         return self._period
+
+    def add_points(self, n: int):
+        self._points += n
 
     def switch_to_state(self, state: Type[GameState]) -> None:
         """Switches the game to the given state"""

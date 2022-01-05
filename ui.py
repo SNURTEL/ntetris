@@ -34,7 +34,7 @@ class UI:
                                  curses.color_pair(1),
                                  'Stats')
         self._score_titles = Text(game, 6, 2, curses.color_pair(1), 'Score\n\nLevel')
-        self._score_values = Text(game, 18, 2, curses.color_pair(1), 'XXX\n\nYYY')
+        self._score_values = Text(game, 18, 2, curses.color_pair(1), f'{self._game.points}\n\nYYY')
 
         # next block window
         self._next_frame = Frame(game, 51, 1, 23, 6, curses.color_pair(1), 'Next')
@@ -101,6 +101,9 @@ class UI:
         self._score_titles.draw()
         self._score_values.draw()
 
+    def update_stats(self):
+        self._score_values.lines = f'{self._game.points}\n\nYYY'
+
     def draw_next(self):
         """
         Draws the next block window
@@ -112,6 +115,8 @@ class UI:
         """
         Draws the top scores window
         """
+        self.update_stats()
+
         self._top_scores_frame.draw()
         self._top_scores_titles.draw()
         self._top_scores_values.draw()
@@ -241,6 +246,14 @@ class Text(Drawable):
         super(Text, self).__init__(game, x_pos, y_pos, color)
         self._lines = lines.split(sep='\n')
         self._align = align
+
+    @property
+    def lines(self):
+        return self._lines
+
+    @lines.setter
+    def lines(self, new_lines: str):
+        self._lines = new_lines.split(sep='\n')
 
     def draw(self):
         """
