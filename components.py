@@ -198,6 +198,11 @@ class Block(BlockPreset):
                        for position in self._block_presets[block_id]]
 
         self._pivot_point = self._pivot_point_presets[block_id]
+        self._points = 0
+
+    @property
+    def points(self):
+        return self._points
 
     @property
     def id(self):
@@ -210,6 +215,9 @@ class Block(BlockPreset):
     @property
     def pivot_point(self):
         return self._pivot_point
+
+    def add_points(self, n: int):
+        self._points += n
 
     def update(self, x: int, y: int):
         """
@@ -366,7 +374,7 @@ class BoardState(ABC):
         pass
 
 
-class SoftDrop(BoardState):
+class Falling(BoardState):
     """
     Game state handling events if the down arrow key was not yet pressed
     """
@@ -393,16 +401,11 @@ class SoftDrop(BoardState):
 
         # update vertical position every board.block_move_period
         if (time.time() - board.last_block_move) > board.block_move_period:
-            if board.block.check_bottom_collisions():
-                # handle collisions
-                board.handle_bottom_collision()
-            else:
-                # move block down
-                board.block.update(0, 1)
-                board.last_block_move = time.time()
+            board.block.update(0, 1)
+            board.last_block_move = time.time()
 
 
-class HardDrop(BoardState):
+class SoftDrop(BoardState):
     """
     Game state handling events if arrow down key was already pressed
     """
@@ -414,13 +417,19 @@ class HardDrop(BoardState):
         :param board: Board class instance passed by the board itself
         :param key: Ignored
         """
-        if board.block.check_bottom_collisions():
-            # handle bottom collisions
-            board.handle_bottom_collision()
-        else:
-            # move the block down
+        if (time.time() - board.last_block_move) > board.game.period:  # TODO rename this
             board.block.update(0, 1)
             board.last_block_move = time.time()
+
+
+class HardDrop(BoardState):
+
+    @staticmethod
+    def update(board: Board, key=None):
+        while not board.block.check_bottom_collisions():
+            board.block.update(0, 1)
+            board.last_block_move = time.time()
+        # board.handle_bottom_collision()
 
 
 class Board(Component):
@@ -453,9 +462,10 @@ class Board(Component):
         self._last_block_move = time.time()
 
         # event handling
+        self._falling = Falling()
         self._soft_drop = SoftDrop()
         self._hard_drop = HardDrop()
-        self._state = SoftDrop
+        self._state = Falling
 
     @property
     def block(self):
@@ -535,7 +545,7 @@ class Board(Component):
                     field.draw(self._position_x, self._position_y)
                 else:
                     self._screen.addch(row_idx + self._position_y, 2 * column_idx + self._position_x + 1, '.',
-                                        curses.color_pair(10) | curses.A_BOLD)
+                                       curses.color_pair(10) | curses.A_BOLD)
 
         try:
             self._block.draw(self._position_x, self._position_y)
@@ -548,19 +558,33 @@ class Board(Component):
         :param key: Key code passed by curses.getch
         """
 
-        if self._block:  # or try
-            # switch do hard_drop on arrow down
-            if key == 258:
-                self._state = self._hard_drop
-            # else:
-            #     self.state = self.soft_drop  # FIXME delayed response
+        if self._block:
+            # switch do soft_drop on arrow down press
+            if not self.block.check_bottom_collisions():
+                if key == 258:
+                    self._state = self._soft_drop
+                elif key == 32:
+                    self._state = self._hard_drop
+                # revert to falling on release
+                else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes
+                    self._state = self._falling
 
-            # handle user input, move the block, handle collisions
-            self._state.update(self, key)
+                # handle user input, move the block, handle collisions aaa
+                self._state.update(self, key)
 
-        else:  # or except AttributeError
+            # handle collisions after a certain amount of time
+            elif (time.time() - self.last_block_move) > self.block_move_period:
+                self.handle_bottom_collision()
+
+            # update the block if on top of another block
+            elif self._state != self._hard_drop:
+                self._state.update(self, key)
+
+            # pass if hard_drop and collision detected
+
+        else:
             # spawn a new block
-            self._state = self._soft_drop
+            self._state = self._falling
 
             self._spawn_block(self._next_block)
             self._next_block = Block(self._game, randint(0, 6))

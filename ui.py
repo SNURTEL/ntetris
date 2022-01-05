@@ -37,9 +37,9 @@ class UI:
         self._score_values = Text(game, 18, 2, curses.color_pair(1), 'XXX\n\nYYY')
 
         # next block window
-        self._next_frame = Frame(game, 51, 1, 18, 6, curses.color_pair(1), 'Next')
+        self._next_frame = Frame(game, 51, 1, 23, 6, curses.color_pair(1), 'Next')
         self._next_block = None
-        self._next_block_position = (56, 4)
+        self._next_block_position = (58, 4)
 
         # top scores
         self._top_scores_frame = Frame(game, 4, 7, 19, 12,
@@ -50,16 +50,16 @@ class UI:
                                            '\n'.join([str(111 * i) for i in reversed(range(1, 10))] + ['000']))
 
         # controls
-        self._controls_frame = Frame(game, 51, 8, 18, 7, curses.color_pair(1), 'Controls')
-        self._controls_titles = Text(game, 53, 9, curses.color_pair(1), 'Left\nRight\nRotate\nDrop\nQuit')
-        self._controls_keys = Text(game, 66, 9, curses.color_pair(1),
-                                       '←\n→\n↑\n↓\nq')
+        self._controls_frame = Frame(game, 51, 8, 23, 8, curses.color_pair(1), 'Controls')
+        self._controls_titles = Text(game, 53, 9, curses.color_pair(1), 'Left\nRight\nRotate\nSoft drop\nHard drop\nQuit')
+        self._controls_keys = Text(game, 65, 9, curses.color_pair(1),
+                                       '←\n→\n↑\n↓\nspace\nq', align='right')
 
         # ####################################
 
         # game ended
         msg = 'Game ended'
-        self._game_ended = Text(self._game, (self._size_x - len(msg))//2, (self._size_y - 1)//2, curses.color_pair(1), msg)
+        self._game_ended = Text(self._game, (self._size_x - len(msg))//2 + 1, (self._size_y - 1)//2, curses.color_pair(1), msg)
 
     @property
     def board_position(self):
@@ -72,11 +72,11 @@ class UI:
         """
         self._next_block = copy(next_block)
         if self._next_block.id == 0:
-            self._next_block_position = (56, 4)
+            self._next_block_position = (58, 4)
         elif self._next_block.id == 3:
-            self._next_block_position = (58, 3)
+            self._next_block_position = (60, 3)
         else:
-            self._next_block_position = (57, 3)
+            self._next_block_position = (59, 3)
 
     def resize(self):
         """
@@ -229,7 +229,7 @@ class Text(Drawable):
     A class representing a piece of text in the UI
     """
 
-    def __init__(self, game, x_pos: int, y_pos: int, color, lines: str):
+    def __init__(self, game, x_pos: int, y_pos: int, color, lines: str, align='left'):
         """
         Inits class Text
         :param game: A game class instance passed by the game itself
@@ -240,10 +240,16 @@ class Text(Drawable):
         """
         super(Text, self).__init__(game, x_pos, y_pos, color)
         self._lines = lines.split(sep='\n')
+        self._align = align
 
     def draw(self):
         """
         Draws the text lines onto the screen
         """
-        for line_idx in range(len(self._lines)):
-            self._game.screen.addstr(self._y_position + line_idx, self._x_position, self._lines[line_idx], self._color)
+        if self._align == "right":
+            max_len = max(len(line) for line in self._lines)
+            for line_idx in range(len(self._lines)):
+                self._game.screen.addstr(self._y_position + line_idx, self._x_position + max_len - len(self._lines[line_idx]), self._lines[line_idx], self._color)
+        else:
+            for line_idx in range(len(self._lines)):
+                self._game.screen.addstr(self._y_position + line_idx, self._x_position, self._lines[line_idx], self._color)
