@@ -33,10 +33,10 @@ class UI:
         self._stats_frame = Frame(game, 4, 1, 19, 7,
                                   curses.color_pair(1),
                                   'Stats')
-        self._score_titles = Text(game, 6, 2, curses.color_pair(1), 'Score\n\nLines\n\nLevel')
-        self._score_value = Text(game, 6, 2, curses.color_pair(1), '{:>15}'.format(str(self._game.points)))
-        self._lines_value = Text(game, 6, 4, curses.color_pair(1), '{:>15}'.format(str(self._game.cleared_lines)))
-        self._level_value = Text(game, 6, 6, curses.color_pair(1), '{:>15}'.format(str(self._game.level)))
+        self._score_titles = TextField(game, 6, 2, curses.color_pair(1), 'Score\n\nLines\n\nLevel')
+        self._score_value = TextField(game, 6, 2, curses.color_pair(1), str(self._game.score).rjust(15))
+        self._lines_value = TextField(game, 6, 4, curses.color_pair(1), str(self._game.cleared_lines).rjust(15))
+        self._level_value = TextField(game, 6, 6, curses.color_pair(1), str(self._game.level).rjust(15))
 
         # next block window
         self._next_frame = Frame(game, 51, 1, 23, 6, curses.color_pair(1), 'Next')
@@ -47,28 +47,40 @@ class UI:
         self._top_scores_frame = Frame(game, 4, 9, 19, 12,
                                        curses.color_pair(1),
                                        'Scoreboard')
-        self._top_scores_titles = Text(game, 6, 10, curses.color_pair(1), '\n'.join([str(i) for i in range(1, 11)]))
-        self._top_scores_values = Text(game, 6, 10, curses.color_pair(1),
-                                       '\n'.join(['{:>15}'.format(str(score)) for score in self._game.scoreboard]))
+        self._top_scores_titles = TextField(game, 6, 10, curses.color_pair(1),
+                                            '\n'.join([str(i) for i in range(1, 11)]))
+        self._top_scores_values = TextField(game, 6, 10, curses.color_pair(1),
+                                            '\n'.join([str(score).rjust(15) for score in self._game.scoreboard]))
 
         # controls
         self._controls_frame = Frame(game, 51, 8, 23, 8, curses.color_pair(1), 'Controls')
-        self._controls_titles = Text(game, 53, 9, curses.color_pair(1),
-                                     'Left\nRight\nRotate\nSoft drop\nHard drop\nQuit')
-        self._controls_keys = Text(game, 65, 9, curses.color_pair(1),
-                                   '←\n→\n↑\n↓\nspace\nq', align='right')
+        self._controls_titles = TextField(game, 53, 9, curses.color_pair(1),
+                                          'Left\nRight\nRotate\nSoft drop\nHard drop\nQuit')
+        self._controls_keys = TextField(game, 65, 9, curses.color_pair(1),
+                                        '←\n→\n↑\n↓\nspace\nq', align='right')
 
         # ####################################
 
         # game ended
-        msg = 'Game ended'
-        self._game_ended = Text(self._game, (self._size_x - len(msg)) // 2 + 1, (self._size_y - 1) // 2,
-                                curses.color_pair(1), msg)
+        self._game_ended_box = Box(self._game, 24, 5, 26, 11, curses.color_pair(20))
+        self._game_ended_frame = Frame(self._game, 24, 5, 26, 11, curses.color_pair(20))
+        self._game_ended_message = TextField(self._game, 25, 7,
+                                             curses.color_pair(1), 'you are not supposed to see this', align='center',
+                                             width=24)
+
+        # ####################################
+
+        # paused
+        self._paused_box = Box(self._game, 24, 8, 26, 6, curses.color_pair(20))
+        self._paused_frame = Frame(self._game, 24, 8, 26, 6, curses.color_pair(20), 'Paused')
+        self._paused_text = TextField(self._game, 25, 10, curses.color_pair(1),
+                                      "space to resume\nq to quit", align='center', width=24)
 
     @property
     def board_position(self):
         return self._board_position
 
+    # TODO ALL THE DOCSTRINGS!!11!!1 IMPORTANT111!!11!!!
     def set_blinking_score(self, flag: bool) -> None:
         """
         Makes the score blink or stops it blinking
@@ -80,39 +92,42 @@ class UI:
         """
         Reloads the scoreboard's contents
         """
-        self._top_scores_values.lines = '\n'.join(['{:>15}'.format(str(score)) for score in self._game.scoreboard])
+        self._top_scores_values.text = '\n'.join(['{:>15}'.format(str(score)) for score in self._game.scoreboard])
 
     def reload_lines(self) -> None:
         """
-        Reloads the cleared lines counter
+        Reloads the cleared text counter
         """
-        self._lines_value.lines = '{:>15}'.format(str(self._game.cleared_lines))
+        self._lines_value.text = '{:>15}'.format(str(self._game.cleared_lines))
 
     def reload_level(self) -> None:
         """
         Reloads the level counter
         :return:
         """
-        self._level_value.lines = '{:>15}'.format(str(self._game.level))
+        self._level_value.text = '{:>15}'.format(str(self._game.level))
 
     def reload_score(self) -> None:
         """
         Reloads the score
         """
-        self._score_value.lines = '{:>15}'.format(str(self._game.points))
+        self._score_value.text = '{:>15}'.format(str(self._game.score))
 
-    def set_next_block(self, next_block: Block) -> None:
+    def reload_next_block(self) -> None:
         """
         Places the next block to be spawned in self.next_block and corrects it's position if needed
-        :param next_block:
         """
-        self._next_block = copy(next_block)
+        self._next_block = copy(self._game.board.next_block)
         if self._next_block.id == 0:
             self._next_block_position = (58, 4)
         elif self._next_block.id == 3:
             self._next_block_position = (60, 3)
         else:
             self._next_block_position = (59, 3)
+
+    def prep_game_ended(self) -> None:
+        msg = f'Game over!\n\nYour score\n{self._game.score}\n\nspace to play again\nq to quit'
+        self._game_ended_message.text = msg
 
     def resize(self):
         """
@@ -122,7 +137,7 @@ class UI:
         if is_resized:
             curses.resizeterm(self._size_y, self._size_x)
 
-    def draw_board(self):
+    def draw_board(self):  # TODO refactor to use a Drawable instance instead of all these methods
         """
         Draws the board
         """
@@ -138,7 +153,6 @@ class UI:
         self._lines_value.draw()
         self._level_value.draw()
         self._score_titles.draw()
-
 
     def draw_next(self):
         """
@@ -167,7 +181,14 @@ class UI:
         """
         Draws the 'game ended' message
         """
-        self._game_ended.draw()
+        self._game_ended_box.draw()
+        self._game_ended_frame.draw()
+        self._game_ended_message.draw()
+
+    def draw_paused(self):
+        self._paused_box.draw()
+        self._paused_frame.draw()
+        self._paused_text.draw()
 
 
 class Drawable(ABC):
@@ -217,7 +238,7 @@ class Box(Drawable):
 
         # creates a subwindow
         self._box = self._game.screen.subwin(y_len, x_len, y_pos, x_pos)
-        self._box.bkgd(' ', color | curses.A_BOLD | curses.A_REVERSE)  # no need to use reverse
+        self._box.bkgd(' ', color | curses.A_BOLD)  # no need to use reverse
         self._box.idcok(False)
         self._box.idlok(False)
 
@@ -254,7 +275,10 @@ class Frame(Drawable):
         self._box.idcok(False)
         self._box.idlok(False)
 
-        self._title = Text(game, x_pos + (x_len - len(title)) // 2, y_pos, curses.color_pair(1), title)
+        if not title:
+            title = ''
+
+        self._title = TextField(game, x_pos + (x_len - len(title)) // 2, y_pos, curses.color_pair(1), title)
 
     def draw(self) -> None:
         """
@@ -264,23 +288,34 @@ class Frame(Drawable):
         self._title.draw()
 
 
-class Text(Drawable):
+class TextField(Drawable):
     """
     A class representing a piece of text in the UI
     """
 
-    def __init__(self, game, x_pos: int, y_pos: int, color, lines: str, align='left'):
+    def __init__(self, game, x_pos: int, y_pos: int, color, text: str, *, align='left', width=None, ):
         """
-        Inits class Text
+        Inits class TextField
         :param game: A game class instance passed by the game itself
         :param x_pos: String's x coordinate
         :param y_pos: String's y coordinate
         :param color: A curses.colorpair-like object defining text's appearance
-        :param lines: A string meant do be displayd
+        :param text: A string meant do be displayed
         """
-        super(Text, self).__init__(game, x_pos, y_pos, color)
-        self._lines = lines.split(sep='\n')
+        super(TextField, self).__init__(game, x_pos, y_pos, color)
+        if not width:
+            self._width = 0
+        else:
+            self._width = width
+        self._align_mapping = {'left': 'ljust',
+                               'center': 'center',
+                               'right': 'rjust'}
         self._align = align
+
+        self._lines = text.split(sep='\n')
+        if not width:
+            width = max([len(line) for line in self._lines])
+        self._lines = eval(f'[line.{self._align_mapping[align]}({width}) for line in self._lines]')
         self._blinking = False
 
     @property
@@ -292,28 +327,22 @@ class Text(Drawable):
         self._blinking = new_flag
 
     @property
-    def lines(self):
+    def text(self):
         return self._lines
 
-    @lines.setter
-    def lines(self, new_lines: str):
+    @text.setter
+    def text(self, new_lines: str):
         self._lines = new_lines.split(sep='\n')
+        # if self._align == 'center':
+        #     self._width = max([len(line) for line in self._lines])
+        self._lines = eval(f'[line.{self._align_mapping[self._align]}({self._width}) for line in self._lines]')
 
     def draw(self):
         """
-        Draws the text lines onto the screen
+        Draws the text onto the screen
         """
-        # don't look at this
-        if self._align == "right":
-            max_len = max(len(line) for line in self._lines)
-            for line_idx in range(len(self._lines)):
-                self._game.screen.addstr(self._y_position + line_idx,
-                                         self._x_position + max_len - len(self._lines[line_idx]),
-                                         self._lines[line_idx],
-                                         self._color | (curses.A_BLINK if self._blinking else 1))
-        else:
-            for line_idx in range(len(self._lines)):
-                self._game.screen.addstr(self._y_position + line_idx,
-                                         self._x_position,
-                                         self._lines[line_idx],
-                                         self._color | (curses.A_BLINK if self._blinking else 1))
+        for line_idx in range(len(self._lines)):
+            self._game.screen.addstr(self._y_position + line_idx,
+                                     self._x_position,
+                                     self._lines[line_idx],
+                                     self._color | (curses.A_BLINK if self._blinking else 1))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import curses
+import os
 import time
 import sys
 import json
@@ -54,6 +55,17 @@ class GameState(ABC):
         pass
 
 
+class StartMenu(GameState):
+    def greet(self) -> None:
+        pass
+
+    def handle_events(self) -> None:
+        pass
+
+    def update_screen(self) -> None:
+        pass
+
+
 class Active(GameState):
     """
     Active state of the game
@@ -62,7 +74,7 @@ class Active(GameState):
     #  what about __init__? Seems to work just fine without it...
 
     def greet(self):
-        self._game.reset()
+        self._game.reset_timings()
 
     def handle_events(self) -> None:
         """
@@ -72,9 +84,12 @@ class Active(GameState):
             key = self._game.screen.getch()
             if key == 113:
                 sys.exit()
+            elif key == 27:
+                self._game.switch_to_state(Paused)
             else:
                 self._game.board.update(key)
         except GameEnded:
+
             self._game.switch_to_state(Ended)
 
     def update_screen(self) -> None:
@@ -102,9 +117,10 @@ class Ended(GameState):
         """
         Prepares the scoreboard for display
         """
-        self._game.update_scoreboard(self._game.points)
+        self._game.update_scoreboard(self._game.score)
         self._game.ui.set_blinking_score(False)
         self._game.ui.reload_scoreboard()
+        self._game.ui.prep_game_ended()
 
     def handle_events(self) -> None:
         """
@@ -114,14 +130,49 @@ class Ended(GameState):
 
         if key == 113:
             sys.exit()
+        elif key == 32:
+            self.game.new_game()
 
     def update_screen(self) -> None:
         """
         Draws the board and the UI
         """
-        self._game.ui.draw_game_ended()
+        self._game.screen.erase()
+
+        self._game.ui.draw_board()
         self._game.ui.draw_stats()
+        self._game.ui.draw_next()
         self._game.ui.draw_top_scores()
+        self._game.ui.draw_controls()
+
+        self._game.ui.draw_game_ended()
+
+        self._game.screen.refresh()
+
+
+class Paused(GameState):
+
+    def greet(self) -> None:
+        pass
+
+    def handle_events(self):
+        key = self._game.screen.getch()
+
+        if key == 113:
+            sys.exit()
+        elif key == 32:
+            self._game.switch_to_state(Active)
+
+    def update_screen(self) -> None:
+        self._game.screen.erase()
+
+        self._game.ui.draw_board()
+        self._game.ui.draw_stats()
+        self._game.ui.draw_next()
+        self._game.ui.draw_top_scores()
+        self._game.ui.draw_controls()
+
+        self._game.ui.draw_paused()
 
         self._game.screen.refresh()
 
@@ -155,6 +206,7 @@ class Game:
         # managing states
         self._active = Active(self)
         self._ended = Ended(self)
+        self._paused = Paused(self)
 
         self._state = self._ended
 
@@ -190,7 +242,7 @@ class Game:
         return self._scoreboard
 
     @property
-    def points(self):
+    def score(self):
         return self._points
 
     @property
@@ -234,31 +286,45 @@ class Game:
 
     def add_lines(self, n: int) -> None:
         """
-        Increments the cleared lines counter  and reloads parts of the UI responsible for displaying it
-        :param n: A number of cleared lines to be added
+        Increments the cleared text counter  and reloads parts of the UI responsible for displaying it
+        :param n: A number of cleared text to be added
         """
         self._cleared_lines += n
         self.ui.reload_lines()
 
-    def reset(self) -> None:
+    def new_game(self) -> None:
         """
         Resets current game's stats
         """
         self._level = 0
         self._points = 0
         self._cleared_lines = 0
+        self._start_time = time.time()
+
+        self.board.new_game()
+
+        self.ui.reload_lines()
+        self.ui.reload_level()
+        self.ui.reload_score()
+        self.ui.reload_scoreboard()
+        self.ui.reload_next_block()
+
+        self.switch_to_state(Active)
+
+    def reset_timings(self) -> None:
+        self._last_screen_update = time.time()
+        self._board.reset_timings()
 
     def add_points(self, n: int) -> None:
         """
-        Adds points to the counter and starts flashing it if a new high score has been set; reloads the UI score
-        :param n: the number of points to be added
+        Adds score to the counter and starts flashing it if a new high score has been set; reloads the UI score
+        :param n: the number of score to be added
         :return:
         """
         self._points += n
         if self._points >= self._scoreboard[0]:
             self.ui.set_blinking_score(True)
         self._ui.reload_score()
-
 
     def update_scoreboard(self, points: int) -> None:
         """
@@ -279,9 +345,10 @@ class Game:
         :param state: The next gamestate
         """
 
-        state_mapping = {
+        state_mapping = {  # TODO use eval?
             Active: self._active,
-            Ended: self._ended
+            Ended: self._ended,
+            Paused: self._paused
         }
 
         self._state = state_mapping[state]
@@ -339,6 +406,8 @@ class Game:
         """
         self.switch_to_state(Active)
         self._start_time = time.time()
+
+        self.new_game()
 
         #  main event loop
         try:

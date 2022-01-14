@@ -28,7 +28,7 @@ class Settings:
                                         29: 0.016667}  # level: t[s]
 
         self._CUSTOM_COLORS = {250: (1000, 500, 0),  # orange
-                               251: (250, 250, 250)}  # background
+                               251: (250, 250, 250)}  # background; unused
 
         self._COLOR_PAIRS = {1: (curses.COLOR_WHITE, -1),  # text and UI
                              10: (251, -1),  # background
@@ -38,7 +38,9 @@ class Settings:
                              14: (-1, curses.COLOR_YELLOW),
                              15: (-1, curses.COLOR_GREEN),
                              16: (-1, curses.COLOR_MAGENTA),
-                             17: (-1, curses.COLOR_RED)}
+                             17: (-1, curses.COLOR_RED),
+                             20: (-1, -1)  # background (the actual one)
+                             }
         self._SCOREBOARD_FILENAME = 'scoreboard.json'
 
     @property

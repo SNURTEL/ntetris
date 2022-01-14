@@ -1,4 +1,6 @@
 import curses
+import os
+
 from game import Game
 
 
@@ -10,6 +12,8 @@ def curses_main(screen):
 
 def main():
     """Runs the wrapper"""
+    os.environ.setdefault('ESCDELAY', '25')
+
     curses.wrapper(curses_main)
 
 

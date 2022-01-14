@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 # from game import Game  # cannot be used - circular import
 from random import randint
 from typing import Tuple, List, Set, Union
+from copy import copy
 
 
 class GameEnded(Exception):
@@ -203,6 +204,13 @@ class Block(BlockPreset):
         self._pivot_point = self._pivot_point_presets[block_id]
         self._points = 0
 
+    def __copy__(self):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        result.__dict__.update(self.__dict__)
+        result.tiles = [copy(tile) for tile in self._tiles]
+        return result
+
     @property
     def points(self) -> int:
         return self._points
@@ -215,6 +223,10 @@ class Block(BlockPreset):
     def tiles(self) -> List[Tile]:
         return self._tiles
 
+    @tiles.setter
+    def tiles(self, new_tiles: List[Tile]):
+        self._tiles = new_tiles
+
     @property
     def tile_positions(self) -> List[Tuple[int, int]]:
         return [(tile.x, tile.y) for tile in self._tiles]
@@ -225,8 +237,8 @@ class Block(BlockPreset):
 
     def add_points(self, n: int) -> None:
         """
-        Increases block's points
-        :param n: number of points to be added
+        Increases block's score
+        :param n: number of score to be added
         """
         self._points += n
 
@@ -450,7 +462,7 @@ class HardDrop(BoardState):
     @staticmethod
     def update(board: Board, key=None):
         """
-        Moves the block down and adds points until it hits an obstacle
+        Moves the block down and adds score until it hits an obstacle
         :param board: A Board class instance passed by the board itself
         :param key: Ignored
         """
@@ -540,6 +552,18 @@ class Board(Component):
         # this will never return None, type checking errors should be ignored
         return [t for column in self._grid for t in column if t]
 
+    @property
+    def next_block(self):
+        return self._next_block
+
+    def reset_timings(self) -> None:
+        self.last_block_move = time.time()
+
+    def clear(self) -> None:
+        self._grid = [[None for _ in range(self._size_y)] for _ in range(self._size_x)]
+        self._block = None
+        self._next_block = Block(self.game, randint(0, 6))
+
     def set_position(self, x: int, y: int) -> None:
         """
         Set board's absolute position on the screen
@@ -588,38 +612,30 @@ class Board(Component):
         """
         # a.k.a. "The Great Mess"
 
-        if self._block:
-            # switch do soft_drop on arrow down press
-            if not self.block.check_bottom_collisions():
-                if key == 258:
-                    self._state = self._soft_drop
-                elif key == 32:
-                    self._state = self._hard_drop
-                # revert to falling on release
-                else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes - use keyboard or pynput
-                    self._state = self._falling
+        # switch do soft_drop on arrow down press
+        if not self.block.check_bottom_collisions():
+            if key == 258:
+                self._state = self._soft_drop
+            elif key == 32:
+                self._state = self._hard_drop
+            # revert to falling on release
+            else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes - use keyboard or pynput
+                self._state = self._falling
 
-                # handle user input, move the block, handle collisions aaa
-                self._state.update(self, key)
+            # handle user input, move the block, handle collisions aaa
+            self._state.update(self, key)
 
-            # handle collisions after a certain amount of time or if soft dropping
-            elif (time.time() - self.last_block_move) > self.block_move_period * 0.4:
-                self.handle_bottom_collision()
+        # handle collisions after a certain amount of time or if soft dropping
+        elif (time.time() - self.last_block_move) > self.block_move_period * 0.4:
+            self.handle_bottom_collision()
 
-            # update the block if on top of another block
-            elif self._state != self._hard_drop:
-                self._state.update(self, key)
+        # update the block if on top of another block
+        elif self._state != self._hard_drop:
+            self._state.update(self, key)
 
-            # pass if in soft_drop / hard_drop and a collision is detected
-
-        else:
-            # spawn a new block
-            self._state = self._falling
-
-            self._spawn_block(self._next_block)
-            self._next_block = Block(self._game, randint(0, 6))
-
-            self._game.ui.set_next_block(self._next_block)
+    def _load_next_block(self) -> None:
+        self._block = copy(self._next_block)
+        self._next_block = Block(self._game, randint(0, 6))
 
     def _spawn_block(self, block: Block) -> None:
         """
@@ -628,7 +644,8 @@ class Board(Component):
         """
         self._block = block
         self._block.set_position(randint(3, 5), 0)
-        if not self._block.validate_position(self._block.tile_positions):
+        if not block.validate_position(self._block.tile_positions):
+            del self._block
             raise GameEnded
         # self.block.update(randint(0, 6), 0)
 
@@ -653,22 +670,27 @@ class Board(Component):
         rows_to_delete = self._get_full_rows_idx({tile.y for tile in self._block.tiles})
         self._remove_full_rows(rows_to_delete)
 
-        # add points
+        # add score
         # 100 single, 300 double, 500 triple, 800 tetris  # *(level+1)
         if rows_to_delete:
             self._game.add_points(
                 (100 * (2 * len(rows_to_delete) - 1 + int(len(rows_to_delete) == 4)))*(self._game.level + 1))
         self._game.add_points(self._block.points)
 
-        # add cleared lines to counter
+        # add cleared text to counter
         self._game.add_lines(len(rows_to_delete))
 
         # increment level
         if self._game.cleared_lines >= 10 * (self._game.level + 1):
             self.game.level_up()
 
-        # delete the block
-        self._block = None  # or del self.block
+        # load a new block and generate the next one
+        self._spawn_block(self._next_block)
+        self._load_next_block()
+        self._game.ui.reload_next_block()
+
+        # switch states
+        self._state = self._falling
 
     def _remove_full_rows(self, rows_to_delete: List[int]):
         """
@@ -700,3 +722,9 @@ class Board(Component):
 
         # count the occurrences and return the indexes
         return [idx for idx in to_check if tile_y.count(idx) == self._size_x]
+
+    def new_game(self):
+        self.clear()
+        new_block = Block(self._game, randint(0, 6))
+        self._spawn_block(new_block)
+        self._next_block = Block(self._game, randint(0, 6))
