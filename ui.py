@@ -2,6 +2,7 @@ from __future__ import annotations
 from components import *
 from abc import ABC, abstractmethod
 from copy import copy
+from typing import Sequence
 import curses
 
 
@@ -26,8 +27,15 @@ class UI:
                                   self._board_position[1] - 1,
                                   2 * self._game.board.size_x + 2,
                                   self._game.board.size_y + 2,
-                                  curses.color_pair(1),
+                                  curses.color_pair(1),  # TODO check if the window is big enough for the game to run
                                   'Game')
+        # self._board_frame = Frame(game,
+        #                           self._board_position[0] - 1,
+        #                           self._board_position[1] - 1,
+        #                           2 * self._game.board.size_x + 2,
+        #                           self._game.board.size_y + 2,
+        #                           curses.color_pair(1),
+        #                           'Game')
 
         # stats window
         self._stats_frame = Frame(game, 4, 1, 19, 7,
@@ -76,11 +84,36 @@ class UI:
         self._paused_text = TextField(self._game, 25, 10, curses.color_pair(1),
                                       "space to resume\nq to quit", align='center', width=24)
 
+        # ####################################
+
+        # start menu
+
+        tetris_title_text = ' _   _  ____ _______   _______ ______ _______ _____  _____  _____ \n'
+        tetris_title_text += '| \ | |/ __ \__   __| |__   __|  ____|__   __|  __ \|_   _|/ ____|\n'
+        tetris_title_text += '|  \| | |  | | | |       | |  | |__     | |  | |__) | | | | (___  \n'
+        tetris_title_text += '| . ` | |  | | | |       | |  |  __|    | |  |  _  /  | |  \___ \ \n'
+        tetris_title_text += '| |\  | |__| | | |       | |  | |____   | |  | | \ \ _| |_ ____) |\n'
+        tetris_title_text += '|_| \_|\____/  |_|       |_|  |______|  |_|  |_|  \_\_____|_____/ '
+
+        self._tetris_title = TextField(self._game, 3, 2, curses.color_pair(1), tetris_title_text)
+
+        self._instructions_frame = Frame(self._game, 26, 10, 20, 5, curses.color_pair(1))
+        self._instructions_text = TextField(self._game, 27, 11, curses.color_pair(1), 'Space to start\n\nQ to exit',
+                                            align='center', width=18)
+
+        # ####################################
+
+        # countdown
+
+        self._countdown_box = Box(self._game, 25, 9, 24, 5, curses.color_pair(20))
+        self._countdown_frame = Frame(self._game, 25, 9, 24, 5, curses.color_pair(20))
+        self._countdown_text = TextField(self._game, 26, 10, curses.color_pair(1),
+                                         "Get ready!\n\n3", align='center', width=22)
+
     @property
     def board_position(self):
         return self._board_position
 
-    # TODO ALL THE DOCSTRINGS!!11!!1 IMPORTANT111!!11!!!
     def set_blinking_score(self, flag: bool) -> None:
         """
         Makes the score blink or stops it blinking
@@ -115,7 +148,7 @@ class UI:
 
     def reload_next_block(self) -> None:
         """
-        Places the next block to be spawned in self.next_block and corrects it's position if needed
+        Places the next block to be spawned in self.next_block and corrects its position if needed
         """
         self._next_block = copy(self._game.board.next_block)
         if self._next_block.id == 0:
@@ -131,6 +164,16 @@ class UI:
         """
         msg = f'Game over!\n\nYour score\n{self._game.score}\n\nspace to play again\nq to quit'
         self._game_ended_message.text = msg
+
+    def reload_countdown(self) -> None:
+        """
+        Updates the countdown window
+        """
+        if self._game.countdown.ticks_to_start == 1:
+            num = 'GO!'
+        else:
+            num = self._game.countdown.ticks_to_start - 1
+        self._countdown_text.text = f"Get ready!\n\n{num}"
 
     def resize(self):
         """
@@ -162,7 +205,10 @@ class UI:
         Draws the next block window
         """
         self._next_frame.draw()
-        self._next_block.draw(*self._next_block_position)
+        try:
+            self._next_block.draw(*self._next_block_position)
+        except AttributeError:
+            pass
 
     def draw_top_scores(self):
         """
@@ -189,9 +235,28 @@ class UI:
         self._game_ended_message.draw()
 
     def draw_paused(self):
+        """
+        Draws the paused window onto the screen
+        """
         self._paused_box.draw()
         self._paused_frame.draw()
         self._paused_text.draw()
+
+    def draw_start_menu(self):
+        """
+        Draws the start menu onto the screen
+        """
+        self._tetris_title.draw()
+        self._instructions_frame.draw()
+        self._instructions_text.draw()
+
+    def draw_countdown(self):
+        """
+        Draws the countdown window onto the screen
+        """
+        self._countdown_box.draw()
+        self._countdown_frame.draw()
+        self._countdown_text.draw()
 
 
 class Drawable(ABC):
@@ -199,18 +264,12 @@ class Drawable(ABC):
     Base class used for creating UI components
     """
 
-    def __init__(self, game, x: int, y: int, color):
+    def __init__(self, game):
         """
         Inits class Drawable
         :param game: A game class instance passed by the game itself
-        :param x: Component's x coordinate
-        :param y: Component's y coordinate
-        :param color: A curses.colorpair-like object defining component's appearance
         """
         self._game = game
-        self._x_position = x
-        self._y_position = y
-        self._color = color
 
     @abstractmethod
     def draw(self) -> None:
@@ -218,6 +277,17 @@ class Drawable(ABC):
         Draws the object onto the screen
         """
         pass
+
+
+#
+# class Group(Drawable):
+#     def __init__(self, game, items: Sequence[Drawable]):
+#         super(Group, self).__init__(game)
+#         self._items = items
+#
+#     @property
+#     def items(self):
+#         return self._items
 
 
 class Box(Drawable):
@@ -235,7 +305,11 @@ class Box(Drawable):
         :param y_len: Box's vertical length
         :param color: A curses.colorpair-like object defining box's appearance
         """
-        super(Box, self).__init__(game, x_pos, y_pos, color)
+        super(Box, self).__init__(game)
+        self._x_position = x_pos
+        self._y_position = y_pos
+        self._color = color
+
         self._x_len = x_len
         self._y_len = y_len
 
@@ -269,7 +343,11 @@ class Frame(Drawable):
         :param title: (Optional) Frame's title, will be placed in frame's top part. Will crash if the title is too
         long to fit in the window
         """
-        super(Frame, self).__init__(game, x_pos, y_pos, color)
+        super(Frame, self).__init__(game)
+
+        self._x_position = x_pos
+        self._y_position = y_pos
+        self._color = color
 
         self.x_len = x_len
         self.y_len = y_len
@@ -305,7 +383,12 @@ class TextField(Drawable):
         :param color: A curses.colorpair-like object defining text's appearance
         :param text: A string meant do be displayed
         """
-        super(TextField, self).__init__(game, x_pos, y_pos, color)
+        super(TextField, self).__init__(game)
+
+        self._x_position = x_pos
+        self._y_position = y_pos
+        self._color = color
+
         if not width:
             self._width = 0
         else:

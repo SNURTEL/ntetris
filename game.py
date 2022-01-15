@@ -55,24 +55,10 @@ class GameState(ABC):
         pass
 
 
-class StartMenu(GameState):
-    # TODO Implement StartMenu
-    def greet(self) -> None:
-        pass
-
-    def handle_events(self) -> None:
-        pass
-
-    def update_screen(self) -> None:
-        pass
-
-
 class Active(GameState):
     """
     Active state of the game
     """
-
-    #  what about __init__? Seems to work just fine without it...
 
     def greet(self):
         self._game.reset_timings()
@@ -133,7 +119,7 @@ class Ended(GameState):
             sys.exit()
         elif key == 32:
             self._game.prep_for_new_game()
-            self._game.switch_to_state(Active)
+            self._game.switch_to_state(Countdown)
 
     def update_screen(self) -> None:
         """
@@ -191,6 +177,101 @@ class Paused(GameState):
         self._game.screen.refresh()
 
 
+class StartMenu(GameState):
+    """
+    Gamestate used for managing navigation around the main menu and starting the game
+    """
+    def greet(self) -> None:
+        """
+        Does nothing - this state is only entered once
+        :return:
+        """
+        pass
+
+    def handle_events(self) -> None:
+        """
+        Handles keypresses
+        """
+        key = self._game.screen.getch()
+
+        if key == 113:
+            sys.exit()
+        elif key == 32:
+            self._game.prep_for_new_game()
+            self._game.switch_to_state(Countdown)
+
+    def update_screen(self) -> None:
+        """
+        Draws the menu
+        """
+        self._game.screen.erase()
+
+        self._game.ui.draw_start_menu()
+
+        self._game.screen.refresh()
+
+
+class Countdown(GameState):
+    """
+    Gamestate used to wait X seconds before the game runs
+    """
+    def __init__(self, game: Game):
+        """
+        Inits class Countdown
+        :param game: Game class instance passed by the game itself
+        """
+        super(Countdown, self).__init__(game)
+        self._ticks_to_start = 4
+        self._last_update = time.time()
+
+    def greet(self) -> None:
+        """
+        Resets the timing-related attributes and reloads the UI
+        """
+        self._ticks_to_start = 4
+        self._game.ui.reload_countdown()
+
+        self._last_update = time.time()
+
+    def handle_events(self) -> None:
+        """
+        Updates the UI every Y seconds, switches to Active after a few ticks; quits the game on q
+        """
+        key = self._game.screen.getch()
+
+        if key == 113:
+            sys.exit()
+
+        if time.time() - self._last_update > 0.65:
+            self._ticks_to_start -= 1
+            self._last_update = time.time()
+            self._game.ui.reload_countdown()
+
+        if self._ticks_to_start == 0:
+            self.game.switch_to_state(Active)
+
+    def update_screen(self) -> None:
+        """
+        Draws the board and the countdown window
+        """
+
+        self._game.screen.erase()
+
+        self._game.ui.draw_board()
+        self._game.ui.draw_stats()
+        self._game.ui.draw_next()
+        self._game.ui.draw_top_scores()
+        self._game.ui.draw_controls()
+
+        self._game.ui.draw_countdown()
+
+        self._game.screen.refresh()
+
+    @property
+    def ticks_to_start(self):
+        return self._ticks_to_start
+
+
 class Game:
     """
     Main class representing a Tetris game. Settings are loaded from settings.py #
@@ -221,6 +302,8 @@ class Game:
         self._active = Active(self)
         self._ended = Ended(self)
         self._paused = Paused(self)
+        self._start_menu = StartMenu(self)
+        self._countdown = Countdown(self)
 
         self._state = self._ended
 
@@ -250,6 +333,10 @@ class Game:
         # init color pairs
         for idx, rgb in self._settings.COLOR_PAIRS.items():
             curses.init_pair(idx, *rgb)
+
+    @property
+    def countdown(self):
+        return self._countdown
 
     @property
     def scoreboard(self):
@@ -363,7 +450,9 @@ class Game:
         state_mapping = {  # TODO use eval?
             Active: self._active,
             Ended: self._ended,
-            Paused: self._paused
+            Paused: self._paused,
+            StartMenu: self._start_menu,
+            Countdown: self._countdown
         }
 
         self._state = state_mapping[state]
@@ -419,10 +508,7 @@ class Game:
         """
         Starts the game
         """
-        self.switch_to_state(Active)
-        self._start_time = time.time()
-
-        self.prep_for_new_game()
+        self.switch_to_state(StartMenu)
 
         #  main event loop
         try:
