@@ -12,6 +12,7 @@ def curses_main(screen):
 
 def main():
     """Runs the wrapper"""
+    # remove the 1s delay on esc key press
     os.environ.setdefault('ESCDELAY', '25')
 
     curses.wrapper(curses_main)

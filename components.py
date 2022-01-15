@@ -131,7 +131,7 @@ class BlockPreset(Component):  # NOT the best way to keep presets
     Keeps all the information necessary for creating new blocks
     """
 
-    def __init__(self, game, block_id, x):
+    def __init__(self, game, block_id, x):  # TODO move to Block
         """
         Inits class BlockPreset
         :param game: Game instance passed by the game itself
@@ -204,7 +204,12 @@ class Block(BlockPreset):
         self._pivot_point = self._pivot_point_presets[block_id]
         self._points = 0
 
-    def __copy__(self):
+    def __copy__(self) -> Block:
+        """
+        Shallow-copies all attributes and clones Tile instances in self._tiles to avoid unnecessary references
+        This should be used instead of deepcopy, as it does not handle curses.window references very well
+        :return: An identical Block instance
+        """  # TODO this is bullshit. __deepcopy__ needs to be overloaded to avoid cloning self._game.screen
         cls = self.__class__
         result = cls.__new__(cls)
         result.__dict__.update(self.__dict__)
@@ -233,7 +238,7 @@ class Block(BlockPreset):
 
     @property
     def pivot_point(self) -> Tuple[int, int]:
-        return self._pivot_point
+        return self._pivot_point  # u wot m8?
 
     def add_points(self, n: int) -> None:
         """
@@ -431,8 +436,7 @@ class Falling(BoardState):
             board.block.rotate(1)
 
         # update vertical position every board.block_move_period
-        if (time.time() - board.last_block_move) > board.block_move_period and \
-                not board.block.check_bottom_collisions():
+        if (time.time() - board.last_block_move) > board.block_move_period:
             board.block.update(0, 1)
             board.last_block_move = time.time()
 
@@ -449,7 +453,7 @@ class SoftDrop(BoardState):
         :param board: Board class instance passed by the board itself
         :param key: Ignored
         """
-        if (time.time() - board.last_block_move) > board.game.period and not board.block.check_bottom_collisions():  # TODO rename this
+        if (time.time() - board.last_block_move) > board.game.period and not board.block.check_bottom_collisions():  # TODO no need to check bottom collisions here
             board.block.update(0, 1)
             board.last_block_move = time.time()
             board.block.add_points(1)
@@ -459,6 +463,7 @@ class HardDrop(BoardState):
     """
     Game state handling events if the block is being hard dropped
     """
+
     @staticmethod
     def update(board: Board, key=None):
         """
@@ -557,12 +562,17 @@ class Board(Component):
         return self._next_block
 
     def reset_timings(self) -> None:
+        """
+        Resets Board's time - related attributes
+        """
         self.last_block_move = time.time()
 
     def clear(self) -> None:
+        """
+        Clears the board
+        """
         self._grid = [[None for _ in range(self._size_y)] for _ in range(self._size_x)]
         self._block = None
-        self._next_block = Block(self.game, randint(0, 6))
 
     def set_position(self, x: int, y: int) -> None:
         """
@@ -631,9 +641,12 @@ class Board(Component):
 
         # update the block if on top of another block
         elif self._state != self._hard_drop:
-            self._state.update(self, key)
+            self._state.update(self, key)  # TODO this should only be done for horizontal movement
 
     def _load_next_block(self) -> None:
+        """
+        Sets the next block as current and generates a new one
+        """
         self._block = copy(self._next_block)
         self._next_block = Block(self._game, randint(0, 6))
 
@@ -662,7 +675,7 @@ class Board(Component):
         Handles bottom collisions; moves the tiles from block.tiles to self.tiles, removes the full rows and
         deletes the block
         """
-
+        # TODO this needs some serious refactoring
         # move tiles from block.tiles to self.tiles and delete the block object
         self._add_to_grid(self._block.tiles)
 
@@ -674,7 +687,7 @@ class Board(Component):
         # 100 single, 300 double, 500 triple, 800 tetris  # *(level+1)
         if rows_to_delete:
             self._game.add_points(
-                (100 * (2 * len(rows_to_delete) - 1 + int(len(rows_to_delete) == 4)))*(self._game.level + 1))
+                (100 * (2 * len(rows_to_delete) - 1 + int(len(rows_to_delete) == 4))) * (self._game.level + 1))
         self._game.add_points(self._block.points)
 
         # add cleared text to counter
@@ -724,6 +737,10 @@ class Board(Component):
         return [idx for idx in to_check if tile_y.count(idx) == self._size_x]
 
     def new_game(self):
+        """
+        Clears the board and generates new blocks
+        :return:
+        """
         self.clear()
         new_block = Block(self._game, randint(0, 6))
         self._spawn_block(new_block)

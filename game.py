@@ -56,6 +56,7 @@ class GameState(ABC):
 
 
 class StartMenu(GameState):
+    # TODO Implement StartMenu
     def greet(self) -> None:
         pass
 
@@ -120,7 +121,7 @@ class Ended(GameState):
         self._game.update_scoreboard(self._game.score)
         self._game.ui.set_blinking_score(False)
         self._game.ui.reload_scoreboard()
-        self._game.ui.prep_game_ended()
+        self._game.ui.reload_game_ended()
 
     def handle_events(self) -> None:
         """
@@ -131,7 +132,8 @@ class Ended(GameState):
         if key == 113:
             sys.exit()
         elif key == 32:
-            self.game.new_game()
+            self._game.prep_for_new_game()
+            self._game.switch_to_state(Active)
 
     def update_screen(self) -> None:
         """
@@ -151,11 +153,20 @@ class Ended(GameState):
 
 
 class Paused(GameState):
+    """
+    Paused state of the game
+    """
 
     def greet(self) -> None:
+        """
+        For now, does nothing
+        """
         pass
 
     def handle_events(self):
+        """
+        Waits for user input and reverts the game back to Active, or quits it
+        """
         key = self._game.screen.getch()
 
         if key == 113:
@@ -164,6 +175,9 @@ class Paused(GameState):
             self._game.switch_to_state(Active)
 
     def update_screen(self) -> None:
+        """
+        Updates the screen
+        """
         self._game.screen.erase()
 
         self._game.ui.draw_board()
@@ -292,9 +306,9 @@ class Game:
         self._cleared_lines += n
         self.ui.reload_lines()
 
-    def new_game(self) -> None:
+    def prep_for_new_game(self) -> None:
         """
-        Resets current game's stats
+
         """
         self._level = 0
         self._points = 0
@@ -309,9 +323,10 @@ class Game:
         self.ui.reload_scoreboard()
         self.ui.reload_next_block()
 
-        self.switch_to_state(Active)
-
     def reset_timings(self) -> None:
+        """
+        Resets game's timing-related attributes
+        """
         self._last_screen_update = time.time()
         self._board.reset_timings()
 
@@ -407,7 +422,7 @@ class Game:
         self.switch_to_state(Active)
         self._start_time = time.time()
 
-        self.new_game()
+        self.prep_for_new_game()
 
         #  main event loop
         try:

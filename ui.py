@@ -53,11 +53,11 @@ class UI:
                                             '\n'.join([str(score).rjust(15) for score in self._game.scoreboard]))
 
         # controls
-        self._controls_frame = Frame(game, 51, 8, 23, 8, curses.color_pair(1), 'Controls')
+        self._controls_frame = Frame(game, 51, 8, 23, 9, curses.color_pair(1), 'Controls')
         self._controls_titles = TextField(game, 53, 9, curses.color_pair(1),
-                                          'Left\nRight\nRotate\nSoft drop\nHard drop\nQuit')
+                                          'Left\nRight\nRotate\nSoft drop\nHard drop\nPause\nQuit')
         self._controls_keys = TextField(game, 65, 9, curses.color_pair(1),
-                                        '←\n→\n↑\n↓\nspace\nq', align='right')
+                                        '←\n→\n↑\n↓\nspace\nesc\nq', align='right')
 
         # ####################################
 
@@ -125,7 +125,10 @@ class UI:
         else:
             self._next_block_position = (59, 3)
 
-    def prep_game_ended(self) -> None:
+    def reload_game_ended(self) -> None:
+        """
+        Updates the 'game over' message
+        """
         msg = f'Game over!\n\nYour score\n{self._game.score}\n\nspace to play again\nq to quit'
         self._game_ended_message.text = msg
 
