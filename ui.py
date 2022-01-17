@@ -29,13 +29,6 @@ class UI:
                                   self._game.board.size_y + 2,
                                   curses.color_pair(1),  # TODO check if the window is big enough for the game to run
                                   'Game')
-        # self._board_frame = Frame(game,
-        #                           self._board_position[0] - 1,
-        #                           self._board_position[1] - 1,
-        #                           2 * self._game.board.size_x + 2,
-        #                           self._game.board.size_y + 2,
-        #                           curses.color_pair(1),
-        #                           'Game')
 
         # stats window
         self._stats_frame = Frame(game, 4, 1, 19, 7,
@@ -70,8 +63,8 @@ class UI:
         # ####################################
 
         # game ended
-        self._game_ended_box = Box(self._game, 24, 5, 26, 11, curses.color_pair(20))
-        self._game_ended_frame = Frame(self._game, 24, 5, 26, 11, curses.color_pair(20))
+        self._game_ended_box = Box(self._game, 24, 5, 26, 12, curses.color_pair(20))
+        self._game_ended_frame = Frame(self._game, 24, 5, 26, 12, curses.color_pair(20))
         self._game_ended_message = TextField(self._game, 25, 7,
                                              curses.color_pair(1), 'you are not supposed to see this', align='center',
                                              width=24)
@@ -79,10 +72,10 @@ class UI:
         # ####################################
 
         # paused
-        self._paused_box = Box(self._game, 24, 8, 26, 6, curses.color_pair(20))
-        self._paused_frame = Frame(self._game, 24, 8, 26, 6, curses.color_pair(20), 'Paused')
+        self._paused_box = Box(self._game, 24, 8, 26, 7, curses.color_pair(20))
+        self._paused_frame = Frame(self._game, 24, 8, 26, 7, curses.color_pair(20), 'Paused')
         self._paused_text = TextField(self._game, 25, 10, curses.color_pair(1),
-                                      "space to resume\nq to quit", align='center', width=24)
+                                      "space to resume\nesc to main menu\nq to quit", align='center', width=24)
 
         # ####################################
 
@@ -97,9 +90,13 @@ class UI:
 
         self._tetris_title = TextField(self._game, 3, 2, curses.color_pair(1), tetris_title_text)
 
-        self._instructions_frame = Frame(self._game, 26, 10, 20, 5, curses.color_pair(1))
-        self._instructions_text = TextField(self._game, 27, 11, curses.color_pair(1), 'Space to start\n\nQ to exit',
-                                            align='center', width=18)
+        self._instructions_frame = Frame(self._game, 20, 10, 32, 7, curses.color_pair(1))
+        self._instructions_text = TextField(self._game, 22, 11, curses.color_pair(1), 'Space to start\n\nQ to exit\n\n← → to choose starting level',
+                                            align='center', width=28)
+
+        self._starting_level_frame = Frame(self._game, 20, 17, 32, 3, curses.color_pair(1))
+        self._starting_level_text = TextField(self._game, 22, 18, curses.color_pair(1), 'Starting level:   ', align='center', width=28)
+        self._starting_level_value = TextField(self._game, 43, 18, curses.color_pair(2) | curses.A_BOLD, str(self._game.start_level))
 
         # ####################################
 
@@ -120,6 +117,12 @@ class UI:
         :param flag: A boolean value indicating if the score should be blinking
         """
         self._score_value.blinking = flag
+
+    def reload_starting_level(self) -> None:
+        """
+        Reloads the starting level value
+        """
+        self._starting_level_value.text = str(self._game.start_level)
 
     def reload_scoreboard(self) -> None:
         """
@@ -162,7 +165,8 @@ class UI:
         """
         Updates the 'game over' message
         """
-        msg = f'Game over!\n\nYour score\n{self._game.score}\n\nspace to play again\nq to quit'
+        score_msg = 'New high score' if self._game.new_high_score else 'Your score'
+        msg = f'Game over!\n\n{score_msg}\n{self._game.score}\n\nspace to play again\nesc to main menu\nq to quit'
         self._game_ended_message.text = msg
 
     def reload_countdown(self) -> None:
@@ -249,6 +253,10 @@ class UI:
         self._tetris_title.draw()
         self._instructions_frame.draw()
         self._instructions_text.draw()
+
+        self._starting_level_frame.draw()
+        self._starting_level_text.draw()
+        self._starting_level_value.draw()
 
     def draw_countdown(self):
         """

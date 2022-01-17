@@ -104,7 +104,7 @@ class Ended(GameState):
         """
         Prepares the scoreboard for display
         """
-        self._game.update_scoreboard(self._game.score)
+        self._game.update_scoreboard()
         self._game.ui.set_blinking_score(False)
         self._game.ui.reload_scoreboard()
         self._game.ui.reload_game_ended()
@@ -120,6 +120,8 @@ class Ended(GameState):
         elif key == 32:
             self._game.prep_for_new_game()
             self._game.switch_to_state(Countdown)
+        elif key == 27:
+            self._game.switch_to_state(StartMenu)
 
     def update_screen(self) -> None:
         """
@@ -158,7 +160,10 @@ class Paused(GameState):
         if key == 113:
             sys.exit()
         elif key == 32:
-            self._game.switch_to_state(Active)
+            self._game.switch_to_state(Countdown)
+        elif key == 27:
+            self._game.update_scoreboard()
+            self._game.switch_to_state(StartMenu)
 
     def update_screen(self) -> None:
         """
@@ -181,12 +186,13 @@ class StartMenu(GameState):
     """
     Gamestate used for managing navigation around the main menu and starting the game
     """
+
     def greet(self) -> None:
         """
-        Does nothing - this state is only entered once
-        :return:
+        Sets game's starting level to 0
         """
-        pass
+        self._game.start_level = 0
+        self._game.ui.reload_starting_level()
 
     def handle_events(self) -> None:
         """
@@ -199,6 +205,12 @@ class StartMenu(GameState):
         elif key == 32:
             self._game.prep_for_new_game()
             self._game.switch_to_state(Countdown)
+        elif key == 260 and self._game.start_level > 0:
+            self._game.start_level -= 1
+            self._game.ui.reload_starting_level()
+        elif key == 261 and self._game.start_level < 29:
+            self._game.start_level += 1
+            self._game.ui.reload_starting_level()
 
     def update_screen(self) -> None:
         """
@@ -215,6 +227,7 @@ class Countdown(GameState):
     """
     Gamestate used to wait X seconds before the game runs
     """
+
     def __init__(self, game: Game):
         """
         Inits class Countdown
@@ -242,7 +255,7 @@ class Countdown(GameState):
         if key == 113:
             sys.exit()
 
-        if time.time() - self._last_update > 0.65:
+        if time.time() - self._last_update > 0.55:
             self._ticks_to_start -= 1
             self._last_update = time.time()
             self._game.ui.reload_countdown()
@@ -291,6 +304,8 @@ class Game:
         self._board = Board(self)
 
         # scoring
+        self._start_level = 0
+
         self._level = 0
         self._points = 0
         self._cleared_lines = 0
@@ -333,6 +348,18 @@ class Game:
         # init color pairs
         for idx, rgb in self._settings.COLOR_PAIRS.items():
             curses.init_pair(idx, *rgb)
+
+    @property
+    def new_high_score(self):
+        return self._points >= self._scoreboard[0]
+
+    @property
+    def start_level(self):
+        return self._start_level
+
+    @start_level.setter
+    def start_level(self, new: int):
+        self._start_level = new
 
     @property
     def countdown(self):
@@ -381,9 +408,16 @@ class Game:
         """
         self._level += 1
         self.ui.reload_level()
-        new_speed = self._block_movement_periods.get(self._level)
-        if new_speed:
-            self._board.block_move_period = new_speed
+        # new_speed = self._block_movement_periods.get(self._level)
+        self._board.block_move_period = self._get_speed(self._level)
+
+    def _get_speed(self, level: int):
+        new_speed = None
+        while not new_speed:
+            new_speed = self._block_movement_periods.get(level)
+            level -= 1
+
+        return new_speed
 
     def add_lines(self, n: int) -> None:
         """
@@ -393,11 +427,15 @@ class Game:
         self._cleared_lines += n
         self.ui.reload_lines()
 
-    def prep_for_new_game(self) -> None:
+    def prep_for_new_game(self, level: int = 0) -> None:
         """
-
+        Resets game's score and timing related attributes and sets the starting level
+        :param level: Override self._start_level
         """
-        self._level = 0
+        if level:
+            self._start_level = level
+        self._level = self._start_level
+        self._board.block_move_period = self._get_speed(self._start_level)
         self._points = 0
         self._cleared_lines = 0
         self._start_time = time.time()
@@ -424,15 +462,16 @@ class Game:
         :return:
         """
         self._points += n
-        if self._points >= self._scoreboard[0]:
+        if self.new_high_score:
             self.ui.set_blinking_score(True)
         self._ui.reload_score()
 
-    def update_scoreboard(self, points: int) -> None:
+    def update_scoreboard(self) -> None:
         """
         Writes the score to the scoreboard if it's in the top 10
         :param points: The score that needs to be checked and, if applicable, written
         """
+        points = self._points
         if points >= self._scoreboard[-1] and points not in self._scoreboard:
             for i in range(len(self._scoreboard)):
                 if self._scoreboard[i] < points:
@@ -526,6 +565,6 @@ class Game:
                     continue
         finally:
             # on sys.exit
-            self.update_scoreboard(self._points)
+            self.update_scoreboard()
             curses.endwin()
             print(':D')

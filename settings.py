@@ -31,6 +31,7 @@ class Settings:
                                251: (250, 250, 250)}  # background; unused
 
         self._COLOR_PAIRS = {1: (curses.COLOR_WHITE, -1),  # text and UI
+                             2: (curses.COLOR_YELLOW, -1),  # colored text
                              10: (251, -1),  # background
                              11: (-1, curses.COLOR_CYAN),  # blocks
                              12: (-1, curses.COLOR_BLUE),
