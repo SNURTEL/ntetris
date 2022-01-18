@@ -1,0 +1,11 @@
+import pytest
+
+@pytest.fixture
+def sample_json():
+    json_contents = {asndgfuhsbdf}
+    fake_handle = StringIO(json_contents)
+    return fake_handle
+
+
+def test_read(sample_json):
+    pass

@@ -1,5 +1,6 @@
 import curses
 import os
+import sys
 
 from game import Game
 
@@ -10,7 +11,7 @@ def curses_main(screen):
     tetris.run_game()
 
 
-def main():
+def main(args):
     """Runs the wrapper"""
     # remove the 1s delay on esc key press
     os.environ.setdefault('ESCDELAY', '25')
@@ -19,4 +20,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)

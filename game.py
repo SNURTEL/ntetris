@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import argparse
 import curses
 import os
 import time
@@ -547,7 +549,18 @@ class Game:
         """
         Starts the game
         """
-        self.switch_to_state(StartMenu)
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--level", help="set starting level")
+        args = parser.parse_args()
+
+        if args.level:
+            # skip the menu and start the game at the specified level
+            self.prep_for_new_game(int(args.level))
+            self.switch_to_state(Countdown)
+        else:
+            # start through main menu
+            self.switch_to_state(StartMenu)
 
         #  main event loop
         try:

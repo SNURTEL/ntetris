@@ -90,12 +90,12 @@ class UI:
 
         self._tetris_title = TextField(self._game, 3, 2, curses.color_pair(1), tetris_title_text)
 
-        self._instructions_frame = Frame(self._game, 20, 10, 32, 7, curses.color_pair(1))
-        self._instructions_text = TextField(self._game, 22, 11, curses.color_pair(1), 'Space to start\n\nQ to exit\n\n← → to choose starting level',
-                                            align='center', width=28)
+        self._instructions_frame = Frame(self._game, 19, 10, 34, 7, curses.color_pair(1))
+        self._instructions_text = TextField(self._game, 20, 11, curses.color_pair(1), 'Space to start\n\nQ to exit\n\n←  →  to choose starting level',
+                                            align='center', width=32)
 
-        self._starting_level_frame = Frame(self._game, 20, 17, 32, 3, curses.color_pair(1))
-        self._starting_level_text = TextField(self._game, 22, 18, curses.color_pair(1), 'Starting level:   ', align='center', width=28)
+        self._starting_level_frame = Frame(self._game, 19, 17, 34, 3, curses.color_pair(1))
+        self._starting_level_text = TextField(self._game, 20, 18, curses.color_pair(1), 'Starting level:   ', align='center', width=32)
         self._starting_level_value = TextField(self._game, 43, 18, curses.color_pair(2) | curses.A_BOLD, str(self._game.start_level))
 
         # ####################################
