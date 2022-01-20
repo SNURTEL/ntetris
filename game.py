@@ -107,7 +107,7 @@ class Ended(GameState):
         Prepares the scoreboard for display
         """
         self._game.update_scoreboard()
-        self._game.ui.set_blinking_score(False)
+        self._game.ui.blinking_score = False
         self._game.ui.reload_scoreboard()
         self._game.ui.reload_game_ended()
 
@@ -287,7 +287,7 @@ class Countdown(GameState):
         return self._ticks_to_start
 
 
-class Game:
+class Game():
     """
     Main class representing a Tetris game. Settings are loaded from settings.py #
     """
@@ -403,6 +403,16 @@ class Game:
     def cleared_lines(self):
         return self._cleared_lines
 
+    def attach_observer(self, obs) -> None:
+        self._observers.append(obs)
+
+    def detach_observer(self, obs) -> None:
+        self._observers.remove(obs)
+
+    def notify(self):
+        for obs in self._observers:
+            obs.notify()
+
     def level_up(self) -> None:
         """
         Increments the level by 1 and reloads parts of the UI responsible for displaying it; increases game's speed
@@ -465,7 +475,7 @@ class Game:
         """
         self._points += n
         if self.new_high_score:
-            self.ui.set_blinking_score(True)
+            self.ui.blinking_score = True
         self._ui.reload_score()
 
     def update_scoreboard(self) -> None:

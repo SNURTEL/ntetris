@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import game
 from components import *
 from abc import ABC, abstractmethod
 from copy import copy
@@ -35,9 +37,10 @@ class UI:
                                   curses.color_pair(1),
                                   'Stats')
         self._score_titles = TextField(game, 6, 2, curses.color_pair(1), 'Score\n\nLines\n\nLevel')
-        self._score_value = TextField(game, 6, 2, curses.color_pair(1), str(self._game.score).rjust(15))
-        self._lines_value = TextField(game, 6, 4, curses.color_pair(1), str(self._game.cleared_lines).rjust(15))
-        self._level_value = TextField(game, 6, 6, curses.color_pair(1), str(self._game.level).rjust(15))
+        self._score_value = TextField(game, 6, 2, curses.color_pair(1), str(self._game.score), align='right', width=15)
+        self._lines_value = TextField(game, 6, 4, curses.color_pair(1), str(self._game.cleared_lines), align='right',
+                                      width=15)
+        self._level_value = TextField(game, 6, 6, curses.color_pair(1), str(self._game.level), align='right', width=15)
 
         # next block window
         self._next_frame = Frame(game, 51, 1, 23, 6, curses.color_pair(1), 'Next')
@@ -91,12 +94,15 @@ class UI:
         self._tetris_title = TextField(self._game, 3, 2, curses.color_pair(1), tetris_title_text)
 
         self._instructions_frame = Frame(self._game, 19, 10, 34, 7, curses.color_pair(1))
-        self._instructions_text = TextField(self._game, 20, 11, curses.color_pair(1), 'Space to start\n\nQ to exit\n\n←  →  to choose starting level',
+        self._instructions_text = TextField(self._game, 20, 11, curses.color_pair(1),
+                                            'Space to start\n\nQ to exit\n\n←  →  to choose starting level',
                                             align='center', width=32)
 
         self._starting_level_frame = Frame(self._game, 19, 17, 34, 3, curses.color_pair(1))
-        self._starting_level_text = TextField(self._game, 20, 18, curses.color_pair(1), 'Starting level:   ', align='center', width=32)
-        self._starting_level_value = TextField(self._game, 43, 18, curses.color_pair(2) | curses.A_BOLD, str(self._game.start_level))
+        self._starting_level_text = TextField(self._game, 20, 18, curses.color_pair(1), 'Starting level:   ',
+                                              align='center', width=32)
+        self._starting_level_value = TextField(self._game, 43, 18, curses.color_pair(2) | curses.A_BOLD,
+                                               str(self._game.start_level))
 
         # ####################################
 
@@ -111,7 +117,52 @@ class UI:
     def board_position(self):
         return self._board_position
 
-    def set_blinking_score(self, flag: bool) -> None:
+    @property
+    def starting_level(self):
+        return self._starting_level_value
+
+    @starting_level.setter
+    def starting_level(self, new_level):
+        self._starting_level_value.text = new_level
+
+    @property
+    def lines(self):
+        return self._lines_value
+
+    @lines.setter
+    def lines(self, new_text):
+        self._lines_value.text = new_text
+
+    @property
+    def score(self):
+        return self._score_value
+
+    @score.setter
+    def score(self, new_score):
+        self._score_value.text = new_score
+
+    @property
+    def level(self):
+        return self._level_value
+
+    @level.setter
+    def level(self, new_level):
+        self._level_value.text = new_level
+
+    @property
+    def countdown(self):
+        return self._countdown_text
+
+    @countdown.setter
+    def countdown(self, new_text):
+        self._countdown_text.text = new_text
+
+    @property
+    def blinking_score(self):
+        return self._score_value.blinking
+
+    @blinking_score.setter
+    def blinking_score(self, flag: bool):
         """
         Makes the score blink or stops it blinking
         :param flag: A boolean value indicating if the score should be blinking
@@ -147,7 +198,7 @@ class UI:
         """
         Reloads the score
         """
-        self._score_value.text = '{:>15}'.format(str(self._game.score))
+        self._score_value.text = str(self._game.score)
 
     def reload_next_block(self) -> None:
         """
@@ -409,7 +460,7 @@ class TextField(Drawable):
         self._lines = text.split(sep='\n')
         if not width:
             width = max([len(line) for line in self._lines])
-        self._lines = eval(f'[line.{self._align_mapping[align]}({width}) for line in self._lines]')
+        self._lines = eval(f'[str(line.{self._align_mapping[align]}({width})) for line in self._lines]')
         self._blinking = False
 
     @property
@@ -429,7 +480,7 @@ class TextField(Drawable):
         self._lines = new_lines.split(sep='\n')
         # if self._align == 'center':
         #     self._width = max([len(line) for line in self._lines])
-        self._lines = eval(f'[line.{self._align_mapping[self._align]}({self._width}) for line in self._lines]')
+        self._lines = eval(f'[str(line.{self._align_mapping[self._align]}({self._width})) for line in self._lines]')
 
     def draw(self):
         """
