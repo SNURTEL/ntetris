@@ -114,7 +114,7 @@ class Tile(Component):
         try:
             self._screen.addstr(self._y + y_offset, 2 * self._x + x_offset, self._chars, self._typeface | curses.A_BOLD)
         except curses.error:
-            print(self._y + y_offset, '####' ,2 * self._x + x_offset)
+            # print(self._y + y_offset, '####', 2 * self._x + x_offset)
             pass  # uhhhhhhh this WILL cause errors
 
     def update(self, x: int, y: int):
@@ -127,18 +127,21 @@ class Tile(Component):
         self._y += y
 
 
-class BlockPreset(Component):  # NOT the best way to keep presets
+class Block(Component):
     """
-    Keeps all the information necessary for creating new blocks
+    Class representing a block of tiles. When the block is placed, tiles are moved to board.tiles and
+    the class instance is deleted
     """
 
-    def __init__(self, game, block_id, x):  # TODO move to Block
+    def __init__(self, game, block_id: int):
         """
-        Inits class BlockPreset
+        Inits class Block
         :param game: Game instance passed by the game itself
+        :param block_id: Indicates which block to spawn, block presets are stored in the superclass
         """
-        super(BlockPreset, self).__init__(game)
-        # ugly; block presets
+        super(Block, self).__init__(game)
+
+        # region block presets
         self._block_presets = (
             #       ####  0 cyan
             [(pos, 0) for pos in range(4)],
@@ -165,39 +168,10 @@ class BlockPreset(Component):  # NOT the best way to keep presets
             14), curses.color_pair(15), curses.color_pair(16), curses.color_pair(17))
 
         # cyan block has a different pivot point
-        self._pivot_point_presets = dict.fromkeys(list(range(1, 7)), [1 + x, 0])
-        self._pivot_point_presets[0] = [1 + x, 1]
+        self._pivot_point_presets = dict.fromkeys(list(range(1, 7)), [1, 0])
+        self._pivot_point_presets[0] = [1, 1]
+        # endregion
 
-    @abstractmethod
-    def update(self, *args, **kwargs) -> None:
-        """
-        Updates the block's position
-        :param args: Ignored
-        :param kwargs: Ignored
-        """
-        super().update()
-
-    @abstractmethod
-    def draw(self, *args, **kwargs) -> None:
-        """
-        Draws the block onto the screen
-        """
-        super().draw()
-
-
-class Block(BlockPreset):
-    """
-    Class representing a block of tiles. When the block is placed, tiles are moved to board.tiles and
-    the class instance is deleted
-    """
-
-    def __init__(self, game, block_id: int):
-        """
-        Inits class Block
-        :param game: Game instance passed by the game itself
-        :param block_id: Indicates which block to spawn, block presets are stored in the superclass
-        """
-        super(Block, self).__init__(game, block_id, 0)
         self._id = block_id
         self._tiles = [Tile(self.game, (position[0], position[1]), self._color_presets[block_id])
                        for position in self._block_presets[block_id]]
@@ -454,7 +428,8 @@ class SoftDrop(BoardState):
         :param board: Board class instance passed by the board itself
         :param key: Ignored
         """
-        if (time.time() - board.last_block_move) > board.game.period and not board.block.check_bottom_collisions():  # TODO no need to check bottom collisions here
+        if (
+                time.time() - board.last_block_move) > board.game.period and not board.block.check_bottom_collisions():  # TODO no need to check bottom collisions here
             board.block.update(0, 1)
             board.last_block_move = time.time()
             board.block.add_points(1)
@@ -601,7 +576,6 @@ class Board(Component):
         """
         Draws the board
         """
-        # TODO maybe use enum?
         for column_idx in range(self._size_x):
             for row_idx in range(self._size_y):
                 field = self._grid[column_idx][row_idx]
@@ -669,7 +643,7 @@ class Board(Component):
         :param tiles: A list of tiles
         """
         for tile in tiles:
-            self._grid[tile.x][tile.y] = tile  # FIXME pycharm u ok????
+            self._grid[tile.x][tile.y] = tile  # pycharm u ok????
 
     def handle_bottom_collision(self) -> None:
         """

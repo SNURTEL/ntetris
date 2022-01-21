@@ -5,9 +5,10 @@ import curses
 import time
 import sys
 import json
+import keyboard
 from settings import Settings
 from components import Board, GameEnded
-from observer import Observable
+from observer import Observable, Observer
 from abc import ABC, abstractmethod
 from ui import UI
 from typing import Type, List
@@ -139,12 +140,12 @@ class Ended(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
-        elif key == 32:
+        elif keyboard.is_pressed(32):
             self._game.prep_for_new_game()
             self._game.switch_to_state(Countdown)
-        elif key == 27:
+        elif keyboard.is_pressed(27):
             self._game.switch_to_state(StartMenu)
 
     def update_screen(self) -> None:
@@ -182,11 +183,11 @@ class Paused(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
-        elif key == 32:
+        elif keyboard.is_pressed(32):
             self._game.switch_to_state(Countdown)
-        elif key == 27:
+        elif keyboard.is_pressed(27):
             self._game.update_scoreboard()
             self._game.switch_to_state(StartMenu)
 
@@ -228,15 +229,15 @@ class StartMenu(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
-        elif key == 32:
+        elif keyboard.is_pressed(32):
             self._game.prep_for_new_game()
             self._game.switch_to_state(Countdown)
-        elif key == 260 and self._game.start_level > 0:
+        elif keyboard.is_pressed(260) and self._game.start_level > 0:
             self._game.start_level -= 1
             self._game.starting_level_observable.set_changed(True)
-        elif key == 261 and self._game.start_level < 29:
+        elif keyboard.is_pressed(261) and self._game.start_level < 29:
             self._game.start_level += 1
             self._game.starting_level_observable.set_changed(True)
 
@@ -284,7 +285,7 @@ class Countdown(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
 
         if time.time() - self._last_update > 0.55:
@@ -321,6 +322,23 @@ class Countdown(GameState):
         return self._ticks_to_start
 
 
+class WindowTooSmall(GameState):
+    def greet(self) -> None:
+        pass
+
+    def update_screen(self) -> None:
+        self._game.screen.erase()
+        self._game.ui.draw_window_too_small()
+        self._game.screen.refresh()
+
+    def handle_events(self) -> None:
+        if not self._game.ui.window_too_small:
+            self._game.revert_state()
+
+    def notify_observers(self):
+        pass
+
+
 class Game:
     """
     Main class representing a Tetris game. Settings are loaded from settings.py #
@@ -355,15 +373,19 @@ class Game:
         self._paused = Paused(self)
         self._start_menu = StartMenu(self)
         self._countdown = Countdown(self)
+        self._window_too_small = WindowTooSmall(self)
 
         self._state = self._ended
-
-        # observers
-        # TODO observables
+        self._previous_state = self._start_menu
 
         # UI
         curses.curs_set(False)
-        self._ui = UI(self)
+        try:
+            self._ui = UI(self)
+        except curses.error:
+            curses.endwin()
+            print('Window too small, please resize!')
+            sys.exit()
 
         self._screen.idcok(False)  # use if flickering appears
         self._screen.idlok(False)
@@ -388,8 +410,12 @@ class Game:
         for idx, rgb in self._settings.COLOR_PAIRS.items():
             curses.init_pair(idx, *rgb)
 
-        # TODO observables
+        # observers
 
+        self.window_size_observer = self.WindowSizeObserver(self)
+        self.ui.window_size_observable.attach_observer(self.window_size_observer)
+
+        # observables
         self.score_observable = Observable(self, [self.ui.score.text_observer])
         self.lines_observable = Observable(self, [self.ui.lines.text_observer])
         self.level_observable = Observable(self, [self.ui.level.text_observer])
@@ -397,10 +423,13 @@ class Game:
         self.countdown_observable = Observable(self, [self.ui.countdown.text_observer])
         self.starting_level_observable = Observable(self, [self.ui.starting_level.text_observer])
         self.game_ended_observable = Observable(self, [self.ui.game_ended.text_observer])
-
         self.next_block_observable = Observable(self, [self.ui.next_block_observer])
 
     # region props
+
+    @property
+    def state(self):
+        return self._state
 
     @property
     def new_high_score(self):
@@ -456,6 +485,11 @@ class Game:
 
     # endregion
 
+    class WindowSizeObserver(Observer):
+        def update(self, observable, **kwargs):
+            if not type(self._outer.state) == WindowTooSmall:
+                self._outer.switch_to_state(WindowTooSmall)
+
     def level_up(self) -> None:
         """
         Increments the level by 1 and reloads parts of the UI responsible for displaying it; increases game's speed
@@ -463,7 +497,6 @@ class Game:
         """
         self._level += 1
         self.level_observable.set_changed(True)
-        # new_speed = self._block_movement_periods.get(self._level)
         self._board.block_move_period = self._get_speed(self._level)
 
     def _get_speed(self, level: int) -> float:
@@ -530,7 +563,6 @@ class Game:
     def update_scoreboard(self) -> None:
         """
         Writes the score to the scoreboard if it's in the top 10
-        :param points: The score that needs to be checked and, if applicable, written
         """
         points = self._points
         if points >= self._scoreboard[-1] and points not in self._scoreboard:
@@ -547,16 +579,21 @@ class Game:
         :param state: The next gamestate
         """
 
-        state_mapping = {  # TODO use eval?
+        state_mapping = {
             Active: self._active,
             Ended: self._ended,
             Paused: self._paused,
             StartMenu: self._start_menu,
-            Countdown: self._countdown
+            Countdown: self._countdown,
+            WindowTooSmall: self._window_too_small
         }
 
+        self._previous_state = self._state
         self._state = state_mapping[state]
         self._state.greet()
+
+    def revert_state(self):
+        self._state = self._previous_state
 
     def _save_scoreboard(self, scoreboard: List[int]) -> None:
         """
@@ -625,14 +662,14 @@ class Game:
         try:
             while True:
                 try:
+                    # terminal resize handling
+                    self._ui.resize()
+
                     # game's logic
                     self._state.handle_events()
 
                     # ui updates
                     self._state.notify_observers()
-
-                    # terminal resize handling  # TODO stop when terminal is not big enough
-                    self._ui.resize()
 
                     # screen re-drawing
                     self._state.update_screen()
