@@ -713,7 +713,7 @@ class Game:
                     continue
         except ImportError:
             curses.endwin()
-            print('Due to the way Keyboard module works, the game must be run with root privileges.')
+            print('Due to the keypress registering limitation in Linux, the game must be run with root privileges.')
             sys.exit()
 
         finally:
