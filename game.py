@@ -163,7 +163,7 @@ class Ended(GameState):
         """
         Draws the board and the UI
         """
-        # this can be all moved to greet
+        # this can all be moved to greet
 
         self._game.ui.draw_board()
         self._game.ui.draw_stats()
@@ -225,7 +225,7 @@ class Paused(GameState):
 
 class StartMenu(GameState):
     """
-    Gamestate used for managing navigation around the main menu and starting the game
+    GameS=tate used for managing navigation around the main menu and starting the game
     """
     _last_update = time.time()
 

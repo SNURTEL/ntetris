@@ -249,8 +249,7 @@ class UI:
         if not is_resized:
             return
         y, x = self._game.screen.getmaxyx()
-        # curses.resizeterm(y, x)
-        # FIXME subwins truncate and cannot be resized back. No reason why
+        #  subwins truncate and cannot be resized back. No reason why
         if self.window_too_small:
             self.window_size_observable.set_changed(True)
             self.window_size_observable.notify(y=y - 1)
@@ -295,8 +294,6 @@ class UI:
         Draws the top scores window
         """
         self._top_scores_frame.draw()
-        # self._top_scores_values.draw()
-        # self._top_scores_titles.draw()
         self._scoreboard.draw()
 
     def draw_controls(self):
@@ -391,7 +388,7 @@ class Box(Drawable):
 
         # creates a subwindow
         self._box = self._game.screen.subwin(y_len, x_len, y_pos, x_pos)
-        self._box.bkgd(' ', color | curses.A_BOLD)  # no need to use reverse
+        self._box.bkgd(' ', color | curses.A_BOLD)
         self._box.idcok(False)
         self._box.idlok(False)
 
@@ -479,7 +476,6 @@ class TextField(Drawable):
 
         self._lines = str(self._align_text(text, width)).split(sep='\n')
 
-        # self._lines = eval(f'[str(line.{self._align_mapping[align]}({width})) for line in self._lines]')
         self._blinking = False
 
         self.text_observer = TextField.TextFieldObserver(self)
@@ -609,7 +605,6 @@ class Scoreboard(TextField):
     @text.setter
     def text(self, new_scores: list):
         self._lines = [f'{idx:<2}{score:>13}' for idx, score in zip(range(1, len(new_scores) + 1), new_scores)]
-        # print([f'{idx:<2}{score:>13}' for idx, score in zip(range(1, len(new_scores) + 1), new_scores)])
 
 
 class Countdown(TextField):

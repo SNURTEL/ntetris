@@ -620,7 +620,7 @@ class Board(Component):
                 self.state = self.soft_drop
 
             # revert to falling on release
-            else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes - use keyboard or pynput
+            else:
                 self.state = self.falling
                 self._space_already_pressed = False
 
@@ -633,7 +633,7 @@ class Board(Component):
 
         # update the block if on top of another block
         elif self.state != self.hard_drop:
-            self.state.update(self)  # TODO this should only be done for horizontal movement
+            self.state.update(self)
 
     def _load_next_block(self) -> None:
         """
@@ -667,7 +667,8 @@ class Board(Component):
         Handles bottom collisions; moves the tiles from block.tiles to self.tiles, removes the full rows and
         deletes the block
         """
-        # TODO this needs some serious refactoring
+        # not a beauty
+
         # move tiles from block.tiles to self.tiles and delete the block object
         self._add_to_grid(self._block.tiles)
 
