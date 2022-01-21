@@ -114,6 +114,7 @@ class Tile(Component):
         try:
             self._screen.addstr(self._y + y_offset, 2 * self._x + x_offset, self._chars, self._typeface | curses.A_BOLD)
         except curses.error:
+            print(self._y + y_offset, '####' ,2 * self._x + x_offset)
             pass  # uhhhhhhh this WILL cause errors
 
     def update(self, x: int, y: int):
@@ -209,7 +210,7 @@ class Block(BlockPreset):
         Shallow-copies all attributes and clones Tile instances in self._tiles to avoid unnecessary references
         This should be used instead of deepcopy, as it does not handle curses.window references very well
         :return: An identical Block instance
-        """  # TODO this is bullshit. __deepcopy__ needs to be overloaded to avoid cloning self._game.screen
+        """
         cls = self.__class__
         result = cls.__new__(cls)
         result.__dict__.update(self.__dict__)
@@ -700,7 +701,6 @@ class Board(Component):
         # load a new block and generate the next one
         self._spawn_block(self._next_block)
         self._load_next_block()
-        self._game.ui.reload_next_block()
 
         # switch states
         self._state = self._falling

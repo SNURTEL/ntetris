@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import argparse
 import curses
-import os
 import time
 import sys
 import json
 from settings import Settings
 from components import Board, GameEnded
+from observer import Observable
 from abc import ABC, abstractmethod
 from ui import UI
 from typing import Type, List
@@ -26,11 +26,20 @@ class GameState(ABC):
         self._game = game
         self._settings = self._game.settings
 
+        self._observables = []
+
     @abstractmethod
     def greet(self) -> None:
         """
         Method called every time games switches to the state
         :return:
+        """
+        pass
+
+    @abstractmethod
+    def notify_observers(self):
+        """
+        Notifies the observers associated with the state and the corresponding UI elements
         """
         pass
 
@@ -96,6 +105,13 @@ class Active(GameState):
 
         self._game.screen.refresh()
 
+    def notify_observers(self):
+        self._game.score_observable.notify(text=self.game.score)
+        self._game.lines_observable.notify(text=self.game.cleared_lines)
+        self._game.level_observable.notify(text=self.game.level)
+        self._game.next_block_observable.notify(block=self.game.board.next_block)
+        self._game.scoreboard_observable.notify(text=self.game.scoreboard)
+
 
 class Ended(GameState):
     """
@@ -107,9 +123,15 @@ class Ended(GameState):
         Prepares the scoreboard for display
         """
         self._game.update_scoreboard()
-        self._game.ui.set_blinking_score(False)
-        self._game.ui.reload_scoreboard()
-        self._game.ui.reload_game_ended()
+        self._game.ui.blinking_score = False
+
+        self._game.score_observable.set_changed(True)
+        self._game.scoreboard_observable.set_changed(True)
+        self._game.game_ended_observable.set_changed(True)
+
+    def notify_observers(self):
+        self._game.game_ended_observable.notify(new_high_score=self._game.new_high_score, score=self._game.score)
+        self._game.scoreboard_observable.notify(text=self.game.scoreboard)
 
     def handle_events(self) -> None:
         """
@@ -129,6 +151,7 @@ class Ended(GameState):
         """
         Draws the board and the UI
         """
+        # this can be all moved to greet
         self._game.screen.erase()
 
         self._game.ui.draw_board()
@@ -183,6 +206,9 @@ class Paused(GameState):
 
         self._game.screen.refresh()
 
+    def notify_observers(self):
+        pass
+
 
 class StartMenu(GameState):
     """
@@ -194,7 +220,7 @@ class StartMenu(GameState):
         Sets game's starting level to 0
         """
         self._game.start_level = 0
-        self._game.ui.reload_starting_level()
+        self._game.starting_level_observable.set_changed(True)
 
     def handle_events(self) -> None:
         """
@@ -209,10 +235,10 @@ class StartMenu(GameState):
             self._game.switch_to_state(Countdown)
         elif key == 260 and self._game.start_level > 0:
             self._game.start_level -= 1
-            self._game.ui.reload_starting_level()
+            self._game.starting_level_observable.set_changed(True)
         elif key == 261 and self._game.start_level < 29:
             self._game.start_level += 1
-            self._game.ui.reload_starting_level()
+            self._game.starting_level_observable.set_changed(True)
 
     def update_screen(self) -> None:
         """
@@ -223,6 +249,9 @@ class StartMenu(GameState):
         self._game.ui.draw_start_menu()
 
         self._game.screen.refresh()
+
+    def notify_observers(self):
+        self._game.starting_level_observable.notify(text=self.game.start_level)
 
 
 class Countdown(GameState):
@@ -244,7 +273,8 @@ class Countdown(GameState):
         Resets the timing-related attributes and reloads the UI
         """
         self._ticks_to_start = 4
-        self._game.ui.reload_countdown()
+
+        self._game.countdown_observable.set_changed(True)
 
         self._last_update = time.time()
 
@@ -260,7 +290,7 @@ class Countdown(GameState):
         if time.time() - self._last_update > 0.55:
             self._ticks_to_start -= 1
             self._last_update = time.time()
-            self._game.ui.reload_countdown()
+            self._game.countdown_observable.set_changed(True)
 
         if self._ticks_to_start == 0:
             self.game.switch_to_state(Active)
@@ -281,6 +311,10 @@ class Countdown(GameState):
         self._game.ui.draw_countdown()
 
         self._game.screen.refresh()
+
+    def notify_observers(self):
+        self._game.countdown_observable.notify(text=self.game.countdown.ticks_to_start)
+        self._game.next_block_observable.notify(block=self._game.board.next_block)
 
     @property
     def ticks_to_start(self):
@@ -324,6 +358,9 @@ class Game:
 
         self._state = self._ended
 
+        # observers
+        # TODO observables
+
         # UI
         curses.curs_set(False)
         self._ui = UI(self)
@@ -350,6 +387,20 @@ class Game:
         # init color pairs
         for idx, rgb in self._settings.COLOR_PAIRS.items():
             curses.init_pair(idx, *rgb)
+
+        # TODO observables
+
+        self.score_observable = Observable(self, [self.ui.score.text_observer])
+        self.lines_observable = Observable(self, [self.ui.lines.text_observer])
+        self.level_observable = Observable(self, [self.ui.level.text_observer])
+        self.scoreboard_observable = Observable(self, [self.ui.scoreboard.text_observer])
+        self.countdown_observable = Observable(self, [self.ui.countdown.text_observer])
+        self.starting_level_observable = Observable(self, [self.ui.starting_level.text_observer])
+        self.game_ended_observable = Observable(self, [self.ui.game_ended.text_observer])
+
+        self.next_block_observable = Observable(self, [self.ui.next_block_observer])
+
+    # region props
 
     @property
     def new_high_score(self):
@@ -403,17 +454,24 @@ class Game:
     def cleared_lines(self):
         return self._cleared_lines
 
+    # endregion
+
     def level_up(self) -> None:
         """
         Increments the level by 1 and reloads parts of the UI responsible for displaying it; increases game's speed
         :return:
         """
         self._level += 1
-        self.ui.reload_level()
+        self.level_observable.set_changed(True)
         # new_speed = self._block_movement_periods.get(self._level)
         self._board.block_move_period = self._get_speed(self._level)
 
-    def _get_speed(self, level: int):
+    def _get_speed(self, level: int) -> float:
+        """
+        Finds the adequate update period for the level
+        :param level: Current game's level
+        :return:
+        """
         new_speed = None
         while not new_speed:
             new_speed = self._block_movement_periods.get(level)
@@ -427,7 +485,7 @@ class Game:
         :param n: A number of cleared text to be added
         """
         self._cleared_lines += n
-        self.ui.reload_lines()
+        self.lines_observable.set_changed(True)
 
     def prep_for_new_game(self, level: int = 0) -> None:
         """
@@ -444,11 +502,11 @@ class Game:
 
         self.board.new_game()
 
-        self.ui.reload_lines()
-        self.ui.reload_level()
-        self.ui.reload_score()
-        self.ui.reload_scoreboard()
-        self.ui.reload_next_block()
+        self.score_observable.set_changed(True)
+        self.lines_observable.set_changed(True)
+        self.level_observable.set_changed(True)
+        self.scoreboard_observable.set_changed(True)
+        self.next_block_observable.set_changed(True)
 
     def reset_timings(self) -> None:
         """
@@ -465,8 +523,9 @@ class Game:
         """
         self._points += n
         if self.new_high_score:
-            self.ui.set_blinking_score(True)
-        self._ui.reload_score()
+            self.ui.blinking_score = True
+        self.score_observable.set_changed(True)
+        self.next_block_observable.set_changed(True)
 
     def update_scoreboard(self) -> None:
         """
@@ -566,13 +625,22 @@ class Game:
         try:
             while True:
                 try:
+                    # game's logic
                     self._state.handle_events()
 
-                    self._state.update_screen()
-                    self._ui.resize()
-                    self._last_screen_update = time.time()
+                    # ui updates
+                    self._state.notify_observers()
 
+                    # terminal resize handling  # TODO stop when terminal is not big enough
+                    self._ui.resize()
+
+                    # screen re-drawing
+                    self._state.update_screen()
+
+                    # timing
+                    self._last_screen_update = time.time()
                     self._wait_till_next_tick()
+
                 except KeyboardInterrupt:
                     # ignore
                     continue
