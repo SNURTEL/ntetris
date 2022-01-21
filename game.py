@@ -5,6 +5,7 @@ import curses
 import time
 import sys
 import json
+import keyboard
 from settings import Settings
 from components import Board, GameEnded
 from observer import Observable, Observer
@@ -139,12 +140,12 @@ class Ended(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
-        elif key == 32:
+        elif keyboard.is_pressed(32):
             self._game.prep_for_new_game()
             self._game.switch_to_state(Countdown)
-        elif key == 27:
+        elif keyboard.is_pressed(27):
             self._game.switch_to_state(StartMenu)
 
     def update_screen(self) -> None:
@@ -182,11 +183,11 @@ class Paused(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
-        elif key == 32:
+        elif keyboard.is_pressed(32):
             self._game.switch_to_state(Countdown)
-        elif key == 27:
+        elif keyboard.is_pressed(27):
             self._game.update_scoreboard()
             self._game.switch_to_state(StartMenu)
 
@@ -228,15 +229,15 @@ class StartMenu(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
-        elif key == 32:
+        elif keyboard.is_pressed(32):
             self._game.prep_for_new_game()
             self._game.switch_to_state(Countdown)
-        elif key == 260 and self._game.start_level > 0:
+        elif keyboard.is_pressed(260) and self._game.start_level > 0:
             self._game.start_level -= 1
             self._game.starting_level_observable.set_changed(True)
-        elif key == 261 and self._game.start_level < 29:
+        elif keyboard.is_pressed(261) and self._game.start_level < 29:
             self._game.start_level += 1
             self._game.starting_level_observable.set_changed(True)
 
@@ -284,7 +285,7 @@ class Countdown(GameState):
         """
         key = self._game.screen.getch()
 
-        if key == 113:
+        if keyboard.is_pressed(113):
             sys.exit()
 
         if time.time() - self._last_update > 0.55:
