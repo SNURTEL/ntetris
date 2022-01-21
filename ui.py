@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import game
 from components import *
 from abc import ABC, abstractmethod
 from copy import copy
-from typing import Sequence
+from observer import Observer
 import curses
 
 
@@ -32,6 +31,8 @@ class UI:
                                   curses.color_pair(1),  # TODO check if the window is big enough for the game to run
                                   'Game')
 
+        # region views
+
         # stats window
         self._stats_frame = Frame(game, 4, 1, 19, 7,
                                   curses.color_pair(1),
@@ -45,16 +46,14 @@ class UI:
         # next block window
         self._next_frame = Frame(game, 51, 1, 23, 6, curses.color_pair(1), 'Next')
         self._next_block = None
-        self._next_block_position = (58, 4)
+        self._next_block_position = (58, 4)  # Block.position should be used instead,
+        # but I have no time to fix this lol
 
         # top scores
         self._top_scores_frame = Frame(game, 4, 9, 19, 12,
                                        curses.color_pair(1),
                                        'Scoreboard')
-        self._top_scores_titles = TextField(game, 6, 10, curses.color_pair(1),
-                                            '\n'.join([str(i) for i in range(1, 11)]))
-        self._top_scores_values = TextField(game, 6, 10, curses.color_pair(1),
-                                            '\n'.join([str(score).rjust(15) for score in self._game.scoreboard]))
+        self._scoreboard = Scoreboard(game, 6, 10, 15, curses.color_pair(1), game.scoreboard)
 
         # controls
         self._controls_frame = Frame(game, 51, 8, 23, 9, curses.color_pair(1), 'Controls')
@@ -68,7 +67,7 @@ class UI:
         # game ended
         self._game_ended_box = Box(self._game, 24, 5, 26, 12, curses.color_pair(20))
         self._game_ended_frame = Frame(self._game, 24, 5, 26, 12, curses.color_pair(20))
-        self._game_ended_message = TextField(self._game, 25, 7,
+        self._game_ended_message = GameEnded(self._game, 25, 7,
                                              curses.color_pair(1), 'you are not supposed to see this', align='center',
                                              width=24)
 
@@ -110,8 +109,63 @@ class UI:
 
         self._countdown_box = Box(self._game, 25, 9, 24, 5, curses.color_pair(20))
         self._countdown_frame = Frame(self._game, 25, 9, 24, 5, curses.color_pair(20))
-        self._countdown_text = TextField(self._game, 26, 10, curses.color_pair(1),
-                                         "Get ready!\n\n3", align='center', width=22)
+        self._countdown_text = Countdown(game, 26, 10, 22, curses.color_pair(1), 999)
+
+        # endregion
+
+        # additional observers
+        self.next_block_observer = UI.NextBlockObserver(self)
+
+    class NextBlockObserver(Observer):
+        """
+        Observer responsible for updating the next block preview
+        """
+        def update(self, observable, **kwargs):
+            """
+            Updates the next block
+            :param observable: event caller
+            :param kwargs: additional kwargs [blocks]
+            """
+            next_block = kwargs['block']
+            self._outer._next_block = copy(next_block)
+            self._outer._next_block.set_position(0, 0)
+            block_id = next_block.id
+            if block_id == 0:
+                self._outer._next_block_position = (58, 4)
+            elif block_id == 3:
+                self._outer._next_block_position = (60, 3)
+            else:
+                self._outer._next_block_position = (59, 3)
+
+    # region props
+
+    @property
+    def scoreboard(self):
+        return self._scoreboard
+
+    @scoreboard.setter
+    def scoreboard(self, new_scores: list):
+        self._scoreboard.text = new_scores
+
+    @property
+    def game_ended(self):
+        return self._game_ended_message
+
+    @game_ended.setter
+    def game_ended(self, new_msg):
+        self._game_ended_message.text = new_msg
+
+    @property
+    def next_block(self):
+        return self._next_block
+
+    @property
+    def next_block_position(self):
+        return self._next_block_position
+
+    @next_block_position.setter
+    def next_block_position(self, new_position: tuple):
+        self._next_block_position = new_position
 
     @property
     def board_position(self):
@@ -169,66 +223,7 @@ class UI:
         """
         self._score_value.blinking = flag
 
-    def reload_starting_level(self) -> None:
-        """
-        Reloads the starting level value
-        """
-        self._starting_level_value.text = str(self._game.start_level)
-
-    def reload_scoreboard(self) -> None:
-        """
-        Reloads the scoreboard's contents
-        """
-        self._top_scores_values.text = '\n'.join(['{:>15}'.format(str(score)) for score in self._game.scoreboard])
-
-    def reload_lines(self) -> None:
-        """
-        Reloads the cleared text counter
-        """
-        self._lines_value.text = '{:>15}'.format(str(self._game.cleared_lines))
-
-    def reload_level(self) -> None:
-        """
-        Reloads the level counter
-        :return:
-        """
-        self._level_value.text = '{:>15}'.format(str(self._game.level))
-
-    def reload_score(self) -> None:
-        """
-        Reloads the score
-        """
-        self._score_value.text = str(self._game.score)
-
-    def reload_next_block(self) -> None:
-        """
-        Places the next block to be spawned in self.next_block and corrects its position if needed
-        """
-        self._next_block = copy(self._game.board.next_block)
-        if self._next_block.id == 0:
-            self._next_block_position = (58, 4)
-        elif self._next_block.id == 3:
-            self._next_block_position = (60, 3)
-        else:
-            self._next_block_position = (59, 3)
-
-    def reload_game_ended(self) -> None:
-        """
-        Updates the 'game over' message
-        """
-        score_msg = 'New high score' if self._game.new_high_score else 'Your score'
-        msg = f'Game over!\n\n{score_msg}\n{self._game.score}\n\nspace to play again\nesc to main menu\nq to quit'
-        self._game_ended_message.text = msg
-
-    def reload_countdown(self) -> None:
-        """
-        Updates the countdown window
-        """
-        if self._game.countdown.ticks_to_start == 1:
-            num = 'GO!'
-        else:
-            num = self._game.countdown.ticks_to_start - 1
-        self._countdown_text.text = f"Get ready!\n\n{num}"
+    # endregion
 
     def resize(self):
         """
@@ -238,7 +233,9 @@ class UI:
         if is_resized:
             curses.resizeterm(self._size_y, self._size_x)
 
-    def draw_board(self):  # TODO refactor to use a Drawable instance instead of all these methods
+    # region draws
+
+    def draw_board(self):
         """
         Draws the board
         """
@@ -270,8 +267,9 @@ class UI:
         Draws the top scores window
         """
         self._top_scores_frame.draw()
-        self._top_scores_values.draw()
-        self._top_scores_titles.draw()
+        # self._top_scores_values.draw()
+        # self._top_scores_titles.draw()
+        self._scoreboard.draw()
 
     def draw_controls(self):
         """
@@ -317,6 +315,8 @@ class UI:
         self._countdown_frame.draw()
         self._countdown_text.draw()
 
+    # endregion
+
 
 class Drawable(ABC):
     """
@@ -336,17 +336,6 @@ class Drawable(ABC):
         Draws the object onto the screen
         """
         pass
-
-
-#
-# class Group(Drawable):
-#     def __init__(self, game, items: Sequence[Drawable]):
-#         super(Group, self).__init__(game)
-#         self._items = items
-#
-#     @property
-#     def items(self):
-#         return self._items
 
 
 class Box(Drawable):
@@ -437,10 +426,12 @@ class TextField(Drawable):
         """
         Inits class TextField
         :param game: A game class instance passed by the game itself
-        :param x_pos: String's x coordinate
-        :param y_pos: String's y coordinate
+        :param x_pos: TextField's x coordinate
+        :param y_pos: TextField's y coordinate
         :param color: A curses.colorpair-like object defining text's appearance
         :param text: A string meant do be displayed
+        :param align: Text's alignment [left/center/right]
+        :param width: TextField's width
         """
         super(TextField, self).__init__(game)
 
@@ -452,16 +443,55 @@ class TextField(Drawable):
             self._width = 0
         else:
             self._width = width
-        self._align_mapping = {'left': 'ljust',
-                               'center': 'center',
-                               'right': 'rjust'}
-        self._align = align
+        align_mapping = {'left': 'ljust',
+                         'center': 'center',
+                         'right': 'rjust'}
+        self._align = align_mapping[align]
 
-        self._lines = text.split(sep='\n')
-        if not width:
-            width = max([len(line) for line in self._lines])
-        self._lines = eval(f'[str(line.{self._align_mapping[align]}({width})) for line in self._lines]')
+        self._lines = str(self._align_text(text, width)).split(sep='\n')
+
+        # self._lines = eval(f'[str(line.{self._align_mapping[align]}({width})) for line in self._lines]')
         self._blinking = False
+
+        self.text_observer = TextField.TextFieldObserver(self)
+
+    class TextFieldObserver(Observer):
+        """
+        Special observer included with every TextField that allows to quickly update its contents
+        """
+        def update(self, observable, **kwargs):
+            """
+            Updates the text field
+            :param observable: event caller
+            :param kwargs: additional kwargs [text]
+            """
+            self._outer.text = kwargs['text']
+
+    def _make_lines(self, text) -> list:
+        """
+        Converts the string into a list of properly aligned lines
+        :param text: String to be processed
+        """
+        return self._align_text(text, self._width).split('\n')
+
+    def _align_text(self, text, width: int = None) -> str:
+        """
+        Inserts empty chars to align lines in string
+        :param text: String to be processed
+        :param width: TextField width
+        """
+        if not width:
+            width = self._get_max_width(text)
+        return '\n'.join([line.__getattribute__(self._align)(width) for line in str(text).split('\n')])
+
+    @staticmethod
+    def _get_max_width(text: str) -> int:
+        """
+        Returns the maximum line length in the string
+        :param text: String to be processed
+        :return:
+        """
+        return max([len(line) for line in text.split('\n')])
 
     @property
     def blinking(self):
@@ -476,18 +506,101 @@ class TextField(Drawable):
         return self._lines
 
     @text.setter
-    def text(self, new_lines: str):
-        self._lines = new_lines.split(sep='\n')
-        # if self._align == 'center':
-        #     self._width = max([len(line) for line in self._lines])
-        self._lines = eval(f'[str(line.{self._align_mapping[self._align]}({self._width})) for line in self._lines]')
+    def text(self, new_text):
+        self._lines = self._make_lines(str(new_text))
 
     def draw(self):
         """
         Draws the text onto the screen
         """
-        for line_idx in range(len(self._lines)):
-            self._game.screen.addstr(self._y_position + line_idx,
+        for idx, line in enumerate(self._lines):
+            self._game.screen.addstr(self._y_position + idx,
                                      self._x_position,
-                                     self._lines[line_idx],
+                                     line,
                                      self._color | (curses.A_BLINK if self._blinking else 1))
+
+
+class Scoreboard(TextField):
+    """
+    A special TextField object with .text setter optimized for building the scoreboard
+    """
+    def __init__(self, game, x_pos: int, y_pos: int, width, color, scores: list):
+        """
+        Inits class Scoreboard
+        :param game: A game class instance passed by the game itself
+        :param x_pos: String's x coordinate
+        :param y_pos: String's y coordinate
+        :param width: Scoreboard's width
+        :param color: A curses.colorpair-like object defining text's appearance
+        :param scores: A list of scores
+        """
+        text = '\n'.join([f'{idx:<2}{score:>13}' for idx, score in zip(range(1, len(scores) + 1), scores)])
+        super(Scoreboard, self).__init__(game, x_pos, y_pos, color, text, width=width)
+
+    @property
+    def text(self):
+        return self._lines
+
+    @text.setter
+    def text(self, new_scores: list):
+        self._lines = [f'{idx:<2}{score:>13}' for idx, score in zip(range(1, len(new_scores) + 1), new_scores)]
+
+
+class Countdown(TextField):
+    """
+    A special TextField object with .text setter optimized for displaying the countdown window
+    """
+    def __init__(self, game, x_pos, y_pos, width, color, ticks_to_start):
+        """
+        Inits class Countdown
+        :param game: A game class instance passed by the game itself
+        :param x_pos: String's x coordinate
+        :param y_pos: String's y coordinate
+        :param width: TextField's width
+        :param color: A curses.colorpair-like object defining text's appearance
+        :param ticks_to_start: 'Ticks' left to start the game
+
+        """
+        text = ticks_to_start
+        super(Countdown, self).__init__(game, x_pos, y_pos, color, text, align='center', width=width)
+
+    @property
+    def text(self):
+        return self._lines
+
+    @text.setter
+    def text(self, ticks_to_start: int):
+        if ticks_to_start == 1:
+            num = 'GO!'
+        else:
+            num = ticks_to_start - 1
+        text = f"Get ready!\n\n{num}"
+        self._lines = self._make_lines(text)
+
+
+class GameEnded(TextField):
+    """
+        A special TextField object with .text setter optimized for displaying the 'game over' message
+    """
+    def __init__(self, game, x_pos: int, y_pos: int, color, text: str, *, align='left', width=None):
+        """
+        Inits class GameEnded
+        :param game: A game class instance passed by the game itself
+        :param x_pos: TextField's x coordinate
+        :param y_pos: TextField's y coordinate
+        :param color: A curses.colorpair-like object defining text's appearance
+        :param text: A string meant do be displayed
+        :param align: Text's alignment [left/center/right]
+        :param width: TextField's width
+        """
+        super(GameEnded, self).__init__(game, x_pos, y_pos, color, text, align=align, width=width)
+        self.text_observer = GameEnded.GameEndedObserver(self)
+
+    class GameEndedObserver(Observer):
+        """
+        A special Observer object used for updating the 'game over' message
+        """
+        def update(self, observable, **kwargs):
+            score_msg = 'New high score' if kwargs['new_high_score'] else 'Your score'
+            msg = f'Game over!\n\n{score_msg}\n{kwargs["score"]}\n\nspace to play again\nesc to main menu\nq to quit'
+            self._outer.text = msg

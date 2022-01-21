@@ -10,7 +10,7 @@ class Settings:
     def __init__(self):
         self._REFRESH_RATE = 60  # hz
         self._BOARD_SIZE = (10, 20)  # x, y
-        self._WINDOW_SIZE = (72, 24)  # x, y
+        self._WINDOW_SIZE = (80, 24)  # x, y
         self._BLOCK_MOVEMENT_PERIODS = {0: 0.8,
                                         1: 0.7166667,
                                         2: 0.6333333,
