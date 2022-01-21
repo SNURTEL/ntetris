@@ -544,6 +544,7 @@ class Scoreboard(TextField):
     @text.setter
     def text(self, new_scores: list):
         self._lines = [f'{idx:<2}{score:>13}' for idx, score in zip(range(1, len(new_scores) + 1), new_scores)]
+        print([f'{idx:<2}{score:>13}' for idx, score in zip(range(1, len(new_scores) + 1), new_scores)])
 
 
 class Countdown(TextField):

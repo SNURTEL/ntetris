@@ -126,10 +126,12 @@ class Ended(GameState):
         self._game.ui.blinking_score = False
 
         self._game.score_observable.set_changed(True)
+        self._game.scoreboard_observable.set_changed(True)
         self._game.game_ended_observable.set_changed(True)
 
     def notify_observers(self):
         self._game.game_ended_observable.notify(new_high_score=self._game.new_high_score, score=self._game.score)
+        self._game.scoreboard_observable.notify(text=self.game.scoreboard)
 
     def handle_events(self) -> None:
         """
