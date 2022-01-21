@@ -7,6 +7,8 @@ from random import randint
 from typing import Tuple, List, Set, Union
 from copy import copy
 
+import keyboard
+
 
 class GameEnded(Exception):
     """
@@ -376,11 +378,10 @@ class BoardState(ABC):
     @staticmethod  # could not reference self.board, as class instances were initialized during
     # Board class initialization
     @abstractmethod
-    def update(board: Board, key: int):
+    def update(board: Board):
         """
         Moves the tiles and / or the current block and handles user input
         :param board: Board class instance passed by the board itself
-        :param key: Keyboard key id extracted by curses.getch
         """
         pass
 
@@ -390,30 +391,40 @@ class Falling(BoardState):
     Game state handling events if the down arrow key was not yet pressed
     """
 
-    @staticmethod
-    def update(board: Board, key: int):
+    _last_block_move_x = time.time()
+    _last_rotation = time.time()
+
+    def update(self, board: Board):
         """
         Handles horizontal movement on key press, moves the tile down or handles bottom collision if
         board.block_move_period passed
         :param board: Board class instance passed by the board itself
-        :param key: Keyboard key id extracted by curses.getch
         """
         # handle horizontal movement
-        key_mapping = {260: -1,
-                       261: 1}
-        x_direction = key_mapping.get(key, None)
-        if x_direction and not board.block.check_side_collisions(x_direction):
-            board.block.update(x_direction, 0)
 
-        # handle rotation
-        #         can also implement counter-clockwise rotation (with argument -1)
-        if key == 259 and board.block.validate_rotation(1):
+        if time.time() - self._last_block_move_x > 0.088:
+            if keyboard.is_pressed(105):
+                x_direction = -1
+            elif keyboard.is_pressed(106):
+                x_direction = 1
+            else:
+                x_direction = 0
+
+            # handle rotation
+            #         can also implement counter-clockwise rotation (with argument -1)
+
+            if x_direction and not board.block.check_side_collisions(x_direction):
+                board.block.update(x_direction, 0)
+                self._last_block_move_x = time.time()
+
+        if keyboard.is_pressed(103) and time.time() - self._last_rotation > 0.2 and board.block.validate_rotation(1):
             board.block.rotate(1)
+            self._last_rotation = time.time()
 
         # update vertical position every board.block_move_period
-        if (time.time() - board.last_block_move) > board.block_move_period:
+        if (time.time() - board.last_block_move_y) > board.block_move_period_y:
             board.block.update(0, 1)
-            board.last_block_move = time.time()
+            board.last_block_move_y = time.time()
 
 
 class SoftDrop(BoardState):
@@ -422,17 +433,19 @@ class SoftDrop(BoardState):
     """
 
     @staticmethod
-    def update(board: Board, key=None):
+    def update(board: Board):
         """
         Calls board.handle_bottom_collision if a bottom collision is detected, moves the block down if it's not
         :param board: Board class instance passed by the board itself
-        :param key: Ignored
         """
-        if (
-                time.time() - board.last_block_move) > board.game.period and not board.block.check_bottom_collisions():  # TODO no need to check bottom collisions here
+        if (time.time() - board.last_block_move_y) > board.block_move_period_y / 2\
+                and not board.block.check_bottom_collisions():
             board.block.update(0, 1)
-            board.last_block_move = time.time()
+            board.last_block_move_y = time.time()
             board.block.add_points(1)
+
+        if keyboard.is_pressed(57):
+            board.state = board.hard_drop
 
 
 class HardDrop(BoardState):
@@ -441,15 +454,14 @@ class HardDrop(BoardState):
     """
 
     @staticmethod
-    def update(board: Board, key=None):
+    def update(board: Board):
         """
         Moves the block down and adds score until it hits an obstacle
         :param board: A Board class instance passed by the board itself
-        :param key: Ignored
         """
         while not board.block.check_bottom_collisions():
             board.block.update(0, 1)
-            board.last_block_move = time.time()
+            board.last_block_move_y = time.time()
             board.block.add_points(2)
 
 
@@ -481,27 +493,28 @@ class Board(Component):
         # timing
         self._block_move_period = game.settings.BLOCK_MOVEMENT_PERIODS[0]
         self._last_block_move = time.time()
+        self._space_already_pressed = False
 
         # event handling
-        self._falling = Falling()
-        self._soft_drop = SoftDrop()
-        self._hard_drop = HardDrop()
-        self._state = Falling
+        self.falling = Falling()
+        self.soft_drop = SoftDrop()
+        self.hard_drop = HardDrop()
+        self.state = Falling
 
     @property
     def block(self):
         return self._block
 
     @property
-    def last_block_move(self):
+    def last_block_move_y(self):
         return self._last_block_move
 
     @property
-    def block_move_period(self):
+    def block_move_period_y(self):
         return self._block_move_period
 
-    @block_move_period.setter
-    def block_move_period(self, new: float):
+    @block_move_period_y.setter
+    def block_move_period_y(self, new: float):
         self._block_move_period = new
 
     @property
@@ -512,8 +525,8 @@ class Board(Component):
     def size_y(self):
         return self._size_y
 
-    @last_block_move.setter
-    def last_block_move(self, new):
+    @last_block_move_y.setter
+    def last_block_move_y(self, new):
         self._last_block_move = new
 
     @property
@@ -541,7 +554,7 @@ class Board(Component):
         """
         Resets Board's time - related attributes
         """
-        self.last_block_move = time.time()
+        self.last_block_move_y = time.time()
 
     def clear(self) -> None:
         """
@@ -590,33 +603,37 @@ class Board(Component):
         except AttributeError:
             pass
 
-    def update(self, key: int) -> None:
+    def update(self) -> None:
         """
         Controls tiles behavior
-        :param key: Key code passed by curses.getch
         """
         # a.k.a. "The Great Mess"
 
         # switch do soft_drop on arrow down press
         if not self.block.check_bottom_collisions():
-            if key == 258:
-                self._state = self._soft_drop
-            elif key == 32:
-                self._state = self._hard_drop
+            if keyboard.is_pressed(57):
+                if not self._space_already_pressed:
+                    self.state = self.hard_drop
+                    self._space_already_pressed = True
+
+            elif keyboard.is_pressed(108):
+                self.state = self.soft_drop
+
             # revert to falling on release
             else:  # FIXME - curses keeps spamming -1 until a certain amount of time passes - use keyboard or pynput
-                self._state = self._falling
+                self.state = self.falling
+                self._space_already_pressed = False
 
             # handle user input, move the block, handle collisions aaa
-            self._state.update(self, key)
+            self.state.update(self)
 
         # handle collisions after a certain amount of time or if soft dropping
-        elif (time.time() - self.last_block_move) > self.block_move_period * 0.4:
+        elif (time.time() - self.last_block_move_y) > self.block_move_period_y * 0.4:
             self.handle_bottom_collision()
 
         # update the block if on top of another block
-        elif self._state != self._hard_drop:
-            self._state.update(self, key)  # TODO this should only be done for horizontal movement
+        elif self.state != self.hard_drop:
+            self.state.update(self)  # TODO this should only be done for horizontal movement
 
     def _load_next_block(self) -> None:
         """
@@ -677,7 +694,7 @@ class Board(Component):
         self._load_next_block()
 
         # switch states
-        self._state = self._falling
+        self.state = self.falling
 
     def _remove_full_rows(self, rows_to_delete: List[int]):
         """

@@ -1,17 +1,20 @@
 from __future__ import annotations
 
-import argparse
 import curses
-import time
 import sys
-import json
+
 import keyboard
+
+import argparse
+import time
+import json
+
 from settings import Settings
 from components import Board, GameEnded
 from observer import Observable, Observer
 from abc import ABC, abstractmethod
 from ui import UI
-from typing import Type, List
+from typing import List
 
 
 class GameState(ABC):
@@ -80,13 +83,12 @@ class Active(GameState):
         Reads keyboard input, updates the board and the UI
         """
         try:
-            key = self._game.screen.getch()
-            if key == 113:
+            if keyboard.is_pressed(16):
                 sys.exit()
-            elif key == 27:
+            elif keyboard.is_pressed(1):
                 self._game.switch_to_state(Paused)
             else:
-                self._game.board.update(key)
+                self._game.board.update()
         except GameEnded:
 
             self._game.switch_to_state(Ended)
@@ -96,17 +98,16 @@ class Active(GameState):
         Draws the board and the UI
         """
 
-        self._game.screen.erase()
-
         self._game.ui.draw_board()
         self._game.ui.draw_stats()
         self._game.ui.draw_next()
         self._game.ui.draw_top_scores()
         self._game.ui.draw_controls()
 
-        self._game.screen.refresh()
-
     def notify_observers(self):
+        """
+        Notifies gameplay-related observers marked with flag 'changed'
+        """
         self._game.score_observable.notify(text=self.game.score)
         self._game.lines_observable.notify(text=self.game.cleared_lines)
         self._game.level_observable.notify(text=self.game.level)
@@ -119,6 +120,8 @@ class Ended(GameState):
     Ended state of the game
     """
 
+    _space_already_pressed = False
+
     def greet(self) -> None:
         """
         Prepares the scoreboard for display
@@ -130,7 +133,12 @@ class Ended(GameState):
         self._game.scoreboard_observable.set_changed(True)
         self._game.game_ended_observable.set_changed(True)
 
+        self._space_already_pressed = True
+
     def notify_observers(self):
+        """
+        Notifies score-related observers marked with flag 'changed'
+        """
         self._game.game_ended_observable.notify(new_high_score=self._game.new_high_score, score=self._game.score)
         self._game.scoreboard_observable.notify(text=self.game.scoreboard)
 
@@ -138,22 +146,24 @@ class Ended(GameState):
         """
         Handles UI navigation, does not update the board
         """
-        key = self._game.screen.getch()
-
-        if keyboard.is_pressed(113):
+        if keyboard.is_pressed(16):
             sys.exit()
-        elif keyboard.is_pressed(32):
-            self._game.prep_for_new_game()
-            self._game.switch_to_state(Countdown)
-        elif keyboard.is_pressed(27):
+        elif keyboard.is_pressed(57):
+            if not self._space_already_pressed:
+                self._game.prep_for_new_game()
+                self._game.switch_to_state(Countdown)
+                self._space_already_pressed = True
+
+        elif keyboard.is_pressed(1):
             self._game.switch_to_state(StartMenu)
+        else:
+            self._space_already_pressed = False
 
     def update_screen(self) -> None:
         """
         Draws the board and the UI
         """
         # this can be all moved to greet
-        self._game.screen.erase()
 
         self._game.ui.draw_board()
         self._game.ui.draw_stats()
@@ -163,39 +173,43 @@ class Ended(GameState):
 
         self._game.ui.draw_game_ended()
 
-        self._game.screen.refresh()
-
 
 class Paused(GameState):
     """
     Paused state of the game
     """
 
+    _esc_already_pressed = True
+
     def greet(self) -> None:
         """
-        For now, does nothing
+        This state can only be entered with the esc key
+        :return:
         """
-        pass
+        self._esc_already_pressed = True
 
     def handle_events(self):
         """
         Waits for user input and reverts the game back to Active, or quits it
         """
-        key = self._game.screen.getch()
 
-        if keyboard.is_pressed(113):
+        if keyboard.is_pressed(1) and self._esc_already_pressed:
+            return
+
+        if keyboard.is_pressed(16):
             sys.exit()
-        elif keyboard.is_pressed(32):
+        elif keyboard.is_pressed(57):
             self._game.switch_to_state(Countdown)
-        elif keyboard.is_pressed(27):
+        elif keyboard.is_pressed(1):
             self._game.update_scoreboard()
             self._game.switch_to_state(StartMenu)
+        else:
+            self._esc_already_pressed = False
 
     def update_screen(self) -> None:
         """
         Updates the screen
         """
-        self._game.screen.erase()
 
         self._game.ui.draw_board()
         self._game.ui.draw_stats()
@@ -205,8 +219,6 @@ class Paused(GameState):
 
         self._game.ui.draw_paused()
 
-        self._game.screen.refresh()
-
     def notify_observers(self):
         pass
 
@@ -215,11 +227,13 @@ class StartMenu(GameState):
     """
     Gamestate used for managing navigation around the main menu and starting the game
     """
+    _last_update = time.time()
 
     def greet(self) -> None:
         """
         Sets game's starting level to 0
         """
+        self._last_update = time.time()
         self._game.start_level = 0
         self._game.starting_level_observable.set_changed(True)
 
@@ -227,19 +241,25 @@ class StartMenu(GameState):
         """
         Handles keypresses
         """
-        key = self._game.screen.getch()
 
-        if keyboard.is_pressed(113):
+        if time.time() - self._last_update < 0.1:
+            return
+
+        if keyboard.is_pressed(16):
             sys.exit()
-        elif keyboard.is_pressed(32):
+        elif keyboard.is_pressed(57):
             self._game.prep_for_new_game()
             self._game.switch_to_state(Countdown)
-        elif keyboard.is_pressed(260) and self._game.start_level > 0:
+            self._last_update = time.time()
+        elif keyboard.is_pressed(105) and self._game.start_level > 0:
             self._game.start_level -= 1
             self._game.starting_level_observable.set_changed(True)
-        elif keyboard.is_pressed(261) and self._game.start_level < 29:
+            self._last_update = time.time()
+
+        elif keyboard.is_pressed(106) and self._game.start_level < 29:
             self._game.start_level += 1
             self._game.starting_level_observable.set_changed(True)
+            self._last_update = time.time()
 
     def update_screen(self) -> None:
         """
@@ -252,22 +272,18 @@ class StartMenu(GameState):
         self._game.screen.refresh()
 
     def notify_observers(self):
+        """
+        Notifies the starting level observer (if marked with flag 'changed')
+        """
         self._game.starting_level_observable.notify(text=self.game.start_level)
 
 
 class Countdown(GameState):
     """
-    Gamestate used to wait X seconds before the game runs
+    GameState used to wait X seconds before the game runs
     """
-
-    def __init__(self, game: Game):
-        """
-        Inits class Countdown
-        :param game: Game class instance passed by the game itself
-        """
-        super(Countdown, self).__init__(game)
-        self._ticks_to_start = 4
-        self._last_update = time.time()
+    _ticks_to_start = 4
+    _last_update = time.time()
 
     def greet(self) -> None:
         """
@@ -276,6 +292,8 @@ class Countdown(GameState):
         self._ticks_to_start = 4
 
         self._game.countdown_observable.set_changed(True)
+        self._game.score_observable.set_changed(True)
+        self._game.level_observable.set_changed(True)
 
         self._last_update = time.time()
 
@@ -283,9 +301,8 @@ class Countdown(GameState):
         """
         Updates the UI every Y seconds, switches to Active after a few ticks; quits the game on q
         """
-        key = self._game.screen.getch()
 
-        if keyboard.is_pressed(113):
+        if keyboard.is_pressed(16):
             sys.exit()
 
         if time.time() - self._last_update > 0.55:
@@ -301,8 +318,6 @@ class Countdown(GameState):
         Draws the board and the countdown window
         """
 
-        self._game.screen.erase()
-
         self._game.ui.draw_board()
         self._game.ui.draw_stats()
         self._game.ui.draw_next()
@@ -311,11 +326,14 @@ class Countdown(GameState):
 
         self._game.ui.draw_countdown()
 
-        self._game.screen.refresh()
-
     def notify_observers(self):
+        """
+        Notifies countdown and block observers'
+        """
         self._game.countdown_observable.notify(text=self.game.countdown.ticks_to_start)
         self._game.next_block_observable.notify(block=self._game.board.next_block)
+        self._game.score_observable.notify(text=self._game.score)
+        self._game.level_observable.notify(text=self._game.level)
 
     @property
     def ticks_to_start(self):
@@ -323,15 +341,25 @@ class Countdown(GameState):
 
 
 class WindowTooSmall(GameState):
+    """
+    GameState used for indicating that the window should be resized
+    """
+
     def greet(self) -> None:
         pass
 
     def update_screen(self) -> None:
+        """
+        Draws the message
+        """
         self._game.screen.erase()
         self._game.ui.draw_window_too_small()
         self._game.screen.refresh()
 
     def handle_events(self) -> None:
+        """
+        Checks if the window has been resized
+        """
         if not self._game.ui.window_too_small:
             self._game.revert_state()
 
@@ -497,7 +525,7 @@ class Game:
         """
         self._level += 1
         self.level_observable.set_changed(True)
-        self._board.block_move_period = self._get_speed(self._level)
+        self._board.block_move_period_y = self._get_speed(self._level)
 
     def _get_speed(self, level: int) -> float:
         """
@@ -528,7 +556,7 @@ class Game:
         if level:
             self._start_level = level
         self._level = self._start_level
-        self._board.block_move_period = self._get_speed(self._start_level)
+        self._board.block_move_period_y = self._get_speed(self._start_level)
         self._points = 0
         self._cleared_lines = 0
         self._start_time = time.time()
@@ -573,7 +601,7 @@ class Game:
                     self._save_scoreboard(self._scoreboard)
                     return
 
-    def switch_to_state(self, state: Type[GameState]) -> None:
+    def switch_to_state(self, state) -> None:
         """
         Switches the game to the given state
         :param state: The next gamestate
@@ -672,7 +700,9 @@ class Game:
                     self._state.notify_observers()
 
                     # screen re-drawing
+                    self._screen.erase()
                     self._state.update_screen()
+                    self._screen.refresh()
 
                     # timing
                     self._last_screen_update = time.time()
@@ -681,8 +711,17 @@ class Game:
                 except KeyboardInterrupt:
                     # ignore
                     continue
+        except ImportError:
+            curses.endwin()
+            print('Due to the way Keyboard module works, the game must be run with root privileges.')
+            sys.exit()
+
         finally:
             # on sys.exit
             self.update_scoreboard()
             curses.endwin()
+
+            # does not work. lol
+            # keyboard.call_later((lambda: keyboard.send('ctrl+u')), delay=0.05)
+
             print(':D')

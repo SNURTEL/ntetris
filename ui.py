@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sys
-
 from components import *
 from abc import ABC, abstractmethod
 from copy import copy
@@ -117,7 +115,8 @@ class UI:
         self._countdown_text = Countdown(game, 26, 10, 22, curses.color_pair(1), 999)
 
         # window too small
-        self._window_too_small = TextField(game, 0, 0, curses.color_pair(1), 'Window too small, please resize!', align='left')
+        self._window_too_small = TextField(game, 0, 0, curses.color_pair(1), 'Window too small, please resize!',
+                                           align='left')
 
         # endregion
 
@@ -254,7 +253,7 @@ class UI:
         # FIXME subwins truncate and cannot be resized back. No reason why
         if self.window_too_small:
             self.window_size_observable.set_changed(True)
-            self.window_size_observable.notify(y=y-1)
+            self.window_size_observable.notify(y=y - 1)
 
     # region draws
 

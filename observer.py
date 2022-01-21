@@ -33,7 +33,7 @@ class Observable:
     def detach_observer(self, observer: Observer) -> None:
         """
         Detaches the observer from the observable
-        :param observer: The obseerver to be detached
+        :param observer: The observer to be detached
         """
         if observer in self._observers:
             self._observers.remove(observer)
