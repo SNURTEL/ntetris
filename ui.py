@@ -3,7 +3,7 @@ from __future__ import annotations
 from components import *
 from abc import ABC, abstractmethod
 from copy import copy
-from observer import Observer, Observable
+from class_models import Observer, Observable
 import curses
 
 

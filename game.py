@@ -11,7 +11,7 @@ import json
 
 from settings import Settings
 from components import Board, GameEnded
-from observer import Observable, Observer
+from class_models import Observable, Observer
 from abc import ABC, abstractmethod
 from ui import UI
 from typing import List
