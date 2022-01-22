@@ -44,20 +44,20 @@ class Component(ABC):
         return self._settings
 
     @abstractmethod
-    def draw(self, *args, **kwargs):
+    def draw(self, x_offset: int, y_offset: int, ):
         """
         Draws the component onto the screen
-        :param args: Ignored
-        :param kwargs: Ignored
+        :param x_offset: X axis offset
+        :param y_offset: Y axis offset
         """
         pass
 
     @abstractmethod
-    def update(self, *args, **kwargs):
+    def update(self, x: int, y: int):
         """
         Updates the component's state
-        :param args: Ignored
-        :param kwargs: Ignored
+        :param x: X axis distance to move, if possible
+        :param y: Y axis distance to move, if possible
         """
         pass
 
@@ -103,15 +103,13 @@ class Tile(Component):
         """
         return self._x, self._y
 
-    def draw(self, x_offset: int, y_offset: int, *args, **kwargs):
+    def draw(self, x_offset: int, y_offset: int):
         """
         Draws the tile onto the screen, offsetting it by a given vector. Tiles are represented by two empty characters
         with a solid background places next to each other in order to correct for terminal font's rectangular glyph
         bounding boxes
         :param x_offset: X axis offset
         :param y_offset: Y axis offset
-        :param args: Ignored
-        :param kwargs: Ignored
         """
         try:
             self._screen.addstr(self._y + y_offset, 2 * self._x + x_offset, self._chars, self._typeface | curses.A_BOLD)
@@ -311,7 +309,7 @@ class Block(Component):
     def validate_position(self, fields_to_check: List[Tuple[int, int]]) -> bool:
         """
         Checks if any of the given fields overlaps with a block or is out of board's bounds
-        :param fields_to_check: (x, y) pairs to be ckecked
+        :param fields_to_check: (x, y) pairs to be checked
         :return: Whether any of the given fields overlaps with a block or is out of board's bounds
         """
         return all(not self._game.board.get_tile(x, y)
@@ -438,7 +436,7 @@ class SoftDrop(BoardState):
         Calls board.handle_bottom_collision if a bottom collision is detected, moves the block down if it's not
         :param board: Board class instance passed by the board itself
         """
-        if (time.time() - board.last_block_move_y) > board.block_move_period_y / 2\
+        if (time.time() - board.last_block_move_y) > board.block_move_period_y / 2 \
                 and not board.block.check_bottom_collisions():
             board.block.update(0, 1)
             board.last_block_move_y = time.time()
@@ -585,15 +583,17 @@ class Board(Component):
         except IndexError:
             return default
 
-    def draw(self) -> None:
+    def draw(self, x_offset: int, y_offset: int) -> None:
         """
-        Draws the board
+        Draws the board at a given offset
+        :param x_offset: X axis offset
+        :param y_offset: Y axis offset
         """
         for column_idx in range(self._size_x):
             for row_idx in range(self._size_y):
                 field = self._grid[column_idx][row_idx]
                 if field:
-                    field.draw(self._position_x, self._position_y)
+                    field.draw(x_offset, y_offset)  # ignore the warning
                 else:
                     self._screen.addch(row_idx + self._position_y, 2 * column_idx + self._position_x + 1, '.',
                                        curses.color_pair(10) | curses.A_BOLD)
@@ -603,9 +603,11 @@ class Board(Component):
         except AttributeError:
             pass
 
-    def update(self) -> None:
+    def update(self, x: int = 0, y: int = 0) -> None:
         """
         Controls tiles behavior
+        :param x: ignored
+        :param y: ignored
         """
         # a.k.a. "The Great Mess"
 

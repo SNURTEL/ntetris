@@ -266,7 +266,7 @@ class UI:
         """
         Draws the board
         """
-        self._game.board.draw()
+        self._game.board.draw(*self._board_position)
         self._board_frame.draw()
 
     def draw_stats(self):
