@@ -333,6 +333,7 @@ class Countdown(GameState):
         self._game.countdown_observable.notify(text=self.game.countdown.ticks_to_start)
         self._game.next_block_observable.notify(block=self._game.board.next_block)
         self._game.score_observable.notify(text=self._game.score)
+        self._game.scoreboard_observable.notify(text=self._game.scoreboard)
         self._game.level_observable.notify(text=self._game.level)
 
     @property
@@ -631,6 +632,12 @@ class Game:
         with open(self._scoreboard_filename, mode='w', encoding='utf-8') as fp:
             self._write_scoreboard(fp, scoreboard)
 
+    def _clear_scoreboard(self, filename: str):
+        empty_sb = [0 for _ in range(10)]
+        with open(filename, mode='w', encoding='utf-8') as fp:
+            self._write_scoreboard(fp, empty_sb)
+        self._scoreboard = empty_sb
+
     @staticmethod
     def _write_scoreboard(fp, scoreboard) -> None:
         """
@@ -676,7 +683,12 @@ class Game:
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--level", help="set starting level")
+        parser.add_argument('--clear-scoreboard', action='store_true', help='clear the scoreboard')
         args = parser.parse_args()
+
+        if args.clear_scoreboard:
+            self._clear_scoreboard('scoreboard.json')
+            self.score_observable.set_changed(True)
 
         if args.level:
             # skip the menu and start the game at the specified level
