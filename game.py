@@ -727,6 +727,9 @@ class Game:
             curses.endwin()
             print('Due to the keypress registering limitation in Linux, the game must be run with root privileges.')
             sys.exit()
+        except AssertionError:
+            curses.endwin()
+            print('Keyboard not found!')
 
         finally:
             # on sys.exit
@@ -735,5 +738,3 @@ class Game:
 
             # does not work. lol
             # keyboard.call_later((lambda: keyboard.send('ctrl+u')), delay=0.05)
-
-            print(':D')
