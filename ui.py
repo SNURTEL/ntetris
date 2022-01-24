@@ -7,10 +7,6 @@ from class_models import Observer, Observable
 import curses
 
 
-class WindowTooSmall(Exception):
-    pass
-
-
 class UI:
     """Class managing game's UI"""
 
