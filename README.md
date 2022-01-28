@@ -1,3 +1,5 @@
+Autor: Tomasz Owienko
+
 ## Spis treści
 
 1. Cel projektu
