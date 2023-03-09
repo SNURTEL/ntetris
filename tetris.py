@@ -2,7 +2,7 @@ import curses
 import os
 import sys
 
-from game import Game
+from src.game import Game
 
 
 def curses_main(screen):

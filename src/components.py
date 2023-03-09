@@ -7,7 +7,7 @@ from random import randint
 from typing import Tuple, List, Set, Union
 from copy import copy
 
-import keyboard
+import settings
 
 
 class GameEnded(Exception):
@@ -29,7 +29,6 @@ class Component(ABC):
         """
         self._game = game
         self._screen = game.screen
-        self._settings = game.settings
 
     @property
     def game(self):
@@ -38,10 +37,6 @@ class Component(ABC):
     @property
     def screen(self):
         return self._screen
-
-    @property
-    def settings(self):
-        return self._settings
 
     @abstractmethod
     def draw(self, x_offset: int, y_offset: int, ):
@@ -480,8 +475,8 @@ class Board(Component):
         self._position_x, self._position_y = (0, 0)
 
         # board size
-        self._size_x = self.settings.BOARD_SIZE[0]
-        self._size_y = self.settings.BOARD_SIZE[1]
+        self._size_x = settings.BOARD_SIZE[0]
+        self._size_y = settings.BOARD_SIZE[1]
 
         # tiles
         self._grid = [[None for _ in range(self._size_y)] for _ in range(self._size_x)]

@@ -3,9 +3,10 @@ from __future__ import annotations
 from components import *
 from abc import ABC, abstractmethod
 from copy import copy
-from class_models import Observer, Observable
+from observers import Observer, Observable
 import curses
 
+from drawables import Drawable
 
 class UI:
     def __init__(self, game):
@@ -337,24 +338,7 @@ class UI:
     # endregion
 
 
-class Drawable(ABC):
-    """
-    Base class used for creating UI components
-    """
 
-    def __init__(self, game):
-        """
-        Inits class Drawable
-        :param game: A game class instance passed by the game itself
-        """
-        self._game = game
-
-    @abstractmethod
-    def draw(self) -> None:
-        """
-        Draws the object onto the screen
-        """
-        pass
 
 
 class Box(Drawable):
@@ -519,7 +503,7 @@ class TextField(Drawable):
             if width is not None:
                 self._outer.width = width
             if text is not None:
-                self._outer.text = text
+                self._outer.lines = text
 
     def _make_lines(self, text) -> list:
         """
@@ -661,4 +645,4 @@ class GameEnded(TextField):
         def update(self, observable, **kwargs):
             score_msg = 'New high score' if kwargs['new_high_score'] else 'Your score'
             msg = f'Game over!\n\n{score_msg}\n{kwargs["score"]}\n\nspace to play again\nesc to main menu\nq to quit'
-            self._outer.text = msg
+            self._outer.lines = msg
