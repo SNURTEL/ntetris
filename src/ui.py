@@ -8,8 +8,6 @@ import curses
 
 
 class UI:
-    """Class managing game's UI"""
-
     def __init__(self, game):
         """
         Inits class UI

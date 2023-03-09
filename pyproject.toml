@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "ntetris"
+version = "0.1.0"
+description = ""
+authors = ["towienko <tomek.owienko@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pytest = "^7.2.2"
+pynput = "^1.7.6"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
