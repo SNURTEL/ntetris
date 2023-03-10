@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from components import *
-from abc import ABC, abstractmethod
+from o_components import *
 from copy import copy
-from observers import Observer, Observable
+from src.observers import Observer, Observable
 import curses
 
-from drawables import Drawable
+from src.drawables import Drawable
+
 
 class UI:
     def __init__(self, game):
@@ -336,9 +336,6 @@ class UI:
         self._countdown_text.draw()
 
     # endregion
-
-
-
 
 
 class Box(Drawable):

@@ -3,7 +3,7 @@ from typing import *
 
 import random
 
-from observers import Observable
+from src.observers import Observable
 
 
 class Board(Observable):
@@ -16,15 +16,14 @@ class Board(Observable):
         [(pos, 1) for pos in range(3)] + [(1, 0)],  # purple
         [(0, 0), (1, 0), (1, 1), (2, 1)]  # red
     )
-    COLORS = ['c', 'b', 'o', 'y', 'g', 'p', 'r']
+    # c, b, o, y, g, p, r
+    COLORS = list(range(10, 18))
 
     def __init__(self, size_x, size_y):
         super(Board, self).__init__()
         self.contents = [[None for _ in range(size_y)] for _ in range(size_x)]
-        self.newblock_tiles: List[Tuple[int, int]] = []
-        self.newblock_color = None  # c, b, o, y, g, p, r
-        self.nextblock_tiles: List[Tuple[int, int]] = []
-        self.nextblock_col = None
+        self.newblock_tiles, self.newblock_color = self._get_random_block()
+        self.nextblock_tiles, self.nextblock_col = self._get_random_block()
 
     def move_block(self, dir: str) -> bool:  # n, s, w, e
         x_offset = -1 if dir is 'w' else 1 if dir is 'e' else 0
@@ -62,15 +61,14 @@ class Board(Observable):
     def place_block(self) -> None:
         for x, y in self.newblock_tiles:
             self.contents[x][y] = self.newblock_color
-        self._get_new_block()
+        self.newblock_tiles, self.newblock_color = self._get_random_block()
 
         self.notify()
 
-    def _get_new_block(self) -> None:
-        pick = random.randint(0, 8)
+    def _get_random_block(self) -> Tuple[List, str]:
+        pick = random.randint(0, 6)
         x_offset = random.randint(3, 5)
-        self.newblock_tiles = [(x + x_offset, y) for x, y in Board.BLOCKS[pick]]
-        self.newblock_color = Board.COLORS[pick]
+        return [(x + x_offset, y) for x, y in Board.BLOCKS[pick]], Board.COLORS[pick]
 
     @property
     def size_x(self) -> int:

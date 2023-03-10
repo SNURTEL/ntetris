@@ -7,7 +7,7 @@ from random import randint
 from typing import Tuple, List, Set, Union
 from copy import copy
 
-import settings
+import o_settings
 
 
 class GameEnded(Exception):
@@ -476,7 +476,7 @@ class Board(Component):
 
         # board size
         self._size_x = settings.BOARD_SIZE[0]
-        self._size_y = settings.BOARD_SIZE[1]
+        self._size_y = o_settings.BOARD_SIZE[1]
 
         # tiles
         self._grid = [[None for _ in range(self._size_y)] for _ in range(self._size_x)]

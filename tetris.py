@@ -2,13 +2,13 @@ import curses
 import os
 import sys
 
-from src.game import Game
+from src.game import run_game
 
 
-def curses_main(screen):
-    """Main function passed to wrapper"""
-    tetris = Game(screen)
-    tetris.run_game()
+# def curses_main(screen):
+#     """Main function passed to wrapper"""
+#     tetris = Game(screen)
+#     tetris.run_game()
 
 
 def main(args):
@@ -16,7 +16,7 @@ def main(args):
     # remove the 1s delay on esc key press
     os.environ.setdefault('ESCDELAY', '25')
 
-    curses.wrapper(curses_main)
+    curses.wrapper(run_game)
 
 
 if __name__ == '__main__':
