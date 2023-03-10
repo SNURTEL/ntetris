@@ -18,7 +18,6 @@ class Drawable(ABC):
     def draw(self) -> None:
         pass
 
-
 class NText(Drawable):
     def __init__(self, screen, text: str, x: int, y: int, color: int, *, alignment='left', blinking=False):
         super(NText, self).__init__(screen, x, y)
@@ -41,6 +40,18 @@ class NText(Drawable):
                                 self.x,
                                 line,
                                 self.color | (curses.A_BLINK if self.blinking else 1))
+
+
+
+class DynamicText(NText):
+    def __init__(self, screen, text_source: callable[[Any], str], x: int, y: int, color: int, *, alignment='left',
+                 blinking=False):
+        super(DynamicText, self).__init__(screen, text_source(), x, y, color, alignment=alignment, blinking=blinking)
+        self._text_source = text_source
+
+    def draw(self) -> None:
+        text = self._text_source()
+        self.lines = self.align_lines(text)
 
 
 class Rect(Drawable, ABC):
@@ -72,6 +83,7 @@ class NFrame(Rect):
     def draw(self) -> None:
         self._subwin.border(0)
         self._title.draw()
+        super(NFrame, self).draw()
 
 
 class BoardDrawable(Drawable):
@@ -87,9 +99,10 @@ class BoardDrawable(Drawable):
                     self._screen.addstr(self.y + row_i, self.x + 2 * col_i, '  ',
                                         curses.color_pair(field) | curses.A_BOLD)
                 else:
-                    self._screen.addch(self.y + row_i, self.x + 2 * col_i +1, '.',
+                    self._screen.addch(self.y + row_i, self.x + 2 * col_i + 1, '.',
                                        curses.color_pair(10) | curses.A_BOLD)
 
         for tile_x, tile_y in self._board.newblock_tiles:
             self._screen.addstr(self.y + tile_y, self.x + 2 * tile_x, '  ',
                                 curses.color_pair(self._board.newblock_color) | curses.A_BOLD)
+

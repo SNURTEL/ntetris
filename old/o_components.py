@@ -678,7 +678,7 @@ class Board(Component):
         if rows_to_delete:
             self._game.add_points(
                 (100 * (2 * len(rows_to_delete) - 1 + int(len(rows_to_delete) == 4))) * (self._game.level + 1))
-        self._game.add_points(self._block.points)
+        self._game.add_points(self._block.score)
 
         # add cleared text to counter
         self._game.add_lines(len(rows_to_delete))

@@ -60,7 +60,7 @@ class Game:
         self._screen = screen
         self._board = Board(*settings.BOARD_SIZE)
         self._stats = Stats()
-        self._window = GameActiveWindow(screen, self._board)
+        self._window = GameActiveWindow(screen, self._board, self._stats)
 
     def handle_key_press(self, key: KeyCode):
         if key == Key.left:
@@ -69,6 +69,11 @@ class Game:
             self._board.move_block('e')
         elif key == Key.up:
             self._board.rotate_block('r')
+        elif key == Key.down:
+            while self._board.move_block('s'):
+                pass
+            self._board.place_block()
+            self._stats.score += 10
         else:
             print(f"{key} pressed")
         pass
@@ -78,6 +83,7 @@ class Game:
             return
 
         self._board.place_block()
+        self._stats.score += 10
 
     def handle_key_release(self, key: Key):
         pass

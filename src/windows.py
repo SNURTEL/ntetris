@@ -5,8 +5,9 @@ import curses
 from abc import ABC
 
 import src.settings as settings
-from src.drawables import Drawable, NText, NBox, NFrame, BoardDrawable
+from src.drawables import Drawable, NText, NBox, NFrame, BoardDrawable, DynamicText
 from src.board import Board
+from src.stats import Stats
 
 
 class Window(Drawable, ABC):
@@ -21,7 +22,7 @@ class Window(Drawable, ABC):
 
 
 class GameActiveWindow(Window):
-    def __init__(self, screen: curses.window, board: Board):
+    def __init__(self, screen: curses.window, board: Board, stats: Stats):
         super(GameActiveWindow, self).__init__(screen)
         board_x = 27
         board_y = 2
@@ -35,3 +36,6 @@ class GameActiveWindow(Window):
 
         self._board_drawable = BoardDrawable(screen, board_x, board_y, board)
         self._contents.append(self._board_drawable)
+
+        self._score = DynamicText(screen, (lambda : str(stats.score)), 6, 2, curses.color_pair(1))
+        self._contents.append(self._score)

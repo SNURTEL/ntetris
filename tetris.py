@@ -5,12 +5,6 @@ import sys
 from src.game import run_game
 
 
-# def curses_main(screen):
-#     """Main function passed to wrapper"""
-#     tetris = Game(screen)
-#     tetris.run_game()
-
-
 def main(args):
     """Runs the wrapper"""
     # remove the 1s delay on esc key press
