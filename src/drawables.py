@@ -18,17 +18,19 @@ class Drawable(ABC):
     def draw(self) -> None:
         pass
 
+
 class NText(Drawable):
-    def __init__(self, screen, text: str, x: int, y: int, color: int, *, alignment='left', blinking=False):
+    def __init__(self, screen, text: str, x: int, y: int, color: int, *, alignment='left', width=None, blinking=False):
         super(NText, self).__init__(screen, x, y)
         self.color = color
         self.alignment = alignment
+        self.width = width
         self.blinking = blinking
 
         self.lines = self.align_lines(text)
 
     def align_lines(self, text: str) -> List[str]:
-        width = max([len(line) for line in text.split('\n')])
+        width = self.width or max([len(line) for line in text.split('\n')])
         align = str.rjust if self.alignment == 'right' \
             else str.center if self.alignment == 'center' \
             else str.ljust
@@ -42,16 +44,16 @@ class NText(Drawable):
                                 self.color | (curses.A_BLINK if self.blinking else 1))
 
 
-
 class DynamicText(NText):
-    def __init__(self, screen, text_source: callable[[Any], str], x: int, y: int, color: int, *, alignment='left',
+    def __init__(self, screen, text_source: callable[[Any], str], x: int, y: int, color: int, *, alignment='left', width=None,
                  blinking=False):
-        super(DynamicText, self).__init__(screen, text_source(), x, y, color, alignment=alignment, blinking=blinking)
+        super(DynamicText, self).__init__(screen, text_source(), x, y, color, alignment=alignment, width=width, blinking=blinking)
         self._text_source = text_source
 
     def draw(self) -> None:
         text = self._text_source()
         self.lines = self.align_lines(text)
+        super(DynamicText, self).draw()
 
 
 class Rect(Drawable, ABC):
@@ -105,4 +107,3 @@ class BoardDrawable(Drawable):
         for tile_x, tile_y in self._board.newblock_tiles:
             self._screen.addstr(self.y + tile_y, self.x + 2 * tile_x, '  ',
                                 curses.color_pair(self._board.newblock_color) | curses.A_BOLD)
-

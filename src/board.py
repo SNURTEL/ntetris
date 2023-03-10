@@ -62,7 +62,7 @@ class Board(Observable):
         return not any([self.contents[x][y] is not None
                         for x, y in new_position])
 
-    def place_block(self) -> None:
+    def place_block(self) -> int:
         lines_to_check = range(min(y for _, y in self.newblock_tiles), max(y for _, y in self.newblock_tiles)+1)
 
         for x, y in self.newblock_tiles:
@@ -73,20 +73,23 @@ class Board(Observable):
 
         self.nextblock_tiles, self.nextblock_color, self.nextblock_pivot = self._get_random_block()
 
+        cleared_lines = 0
         for idx in lines_to_check:
-            self.check_line_full(idx)
+            if self.check_line_full(idx):
+                self.clear_line(idx)
+                cleared_lines += 1
 
         self.notify()
 
-    def check_line_full(self, idx: int):
-        if any(col[idx] is None for col in self.contents):
-            return False
+        return cleared_lines
 
+    def check_line_full(self, idx: int) -> bool:
+        return not any(col[idx] is None for col in self.contents)
+
+    def clear_line(self, idx: int):
         for col in self.contents:
             del col[idx]
             col.insert(0, None)
-
-        return True
 
     def _get_random_block(self) -> Tuple[List, str, List]:
         pick = random.randint(0, 6)

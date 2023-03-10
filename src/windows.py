@@ -37,5 +37,14 @@ class GameActiveWindow(Window):
         self._board_drawable = BoardDrawable(screen, board_x, board_y, board)
         self._contents.append(self._board_drawable)
 
-        self._score = DynamicText(screen, (lambda : str(stats.score)), 6, 2, curses.color_pair(1))
-        self._contents.append(self._score)
+        self._stats_window = NFrame(screen, 4, 1, 19, 7, 'Stats')
+        self._contents.append(self._stats_window)
+
+        self._stats_values = DynamicText(screen, (lambda : f"{str(stats.score)}\n\n"
+                                                           f"{str(stats.lines)}\n\n"
+                                                           f"{str(stats.level)}"), 6, 2,
+                                         curses.color_pair(1), alignment='right', width=15)
+        self._contents.append(self._stats_values)
+
+        self._stats_text = NText(screen, 'Score\n\nLines\n\nLevel', 6, 2, curses.color_pair(1))
+        self._contents.append(self._stats_text)

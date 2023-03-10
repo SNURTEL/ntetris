@@ -70,10 +70,15 @@ class Game:
         elif key == Key.up:
             self._board.rotate_block('r')
         elif key == Key.down:
+            drop_pts = 0
             while self._board.move_block('s'):
+                drop_pts += 2
                 pass
-            self._board.place_block()
-            self._stats.score += 10
+            lines = self._board.place_block()
+            Stats.score += Stats.level * (0, 40, 100, 300, 1200)[lines] + drop_pts
+            Stats.lines += lines
+            if Stats.lines >= 5 * (Stats.level + 1) * Stats.level:
+                Stats.level += 1
         else:
             print(f"{key} pressed")
         pass
@@ -82,8 +87,7 @@ class Game:
         if self._board.move_block('s'):
             return
 
-        self._board.place_block()
-        self._stats.score += 10
+        Stats.score += Stats.level * (40, 100, 300, 1200)[self._board.place_block() - 1]
 
     def handle_key_release(self, key: Key):
         pass
