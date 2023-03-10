@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import *
 
+import time
 import curses
-from threading import Thread
+from threading import Thread, Timer
 
 from pynput.keyboard import KeyCode, Listener, Key
 
@@ -11,26 +12,27 @@ from src.board import Board
 from src.stats import Stats
 from src.windows import GameActiveWindow
 
-import time
-
 
 def run_game(screen: curses.window):
     game = Game(screen)
 
-    g = Thread(target=_game_thread, args=(game,))
-    ui = Thread(target=_ui_thread, args=(game,))
+    threads = [
+        Thread(target=_game_thread, args=(game,)),
+        Thread(target=_ui_thread, args=(game,)),
+        Thread(target=_timer_thread, args=(game,))
+    ]
 
     curses.use_default_colors()
+    curses.curs_set(0)
     for idx, rgb in settings.CUSTOM_COLORS.items():
         curses.init_color(idx, *rgb)
     for idx, rgb in settings.COLOR_PAIRS.items():
         curses.init_pair(idx, *rgb)
 
-    g.start()
-    ui.start()
-
-    g.join()
-    ui.join()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
 
 
 def _game_thread(game: Game):
@@ -42,10 +44,15 @@ def _game_thread(game: Game):
 
 
 def _ui_thread(game: Game):
-    refresh_delay = 1 / settings.REFRESH_RATE
+    refresh_delay = 1. / settings.REFRESH_RATE
     while True:
         time.sleep(refresh_delay)
         game.redraw_screen()
+
+
+def _timer_thread(game: Game):
+    game.handle_timer()
+    Timer(0.5, _timer_thread, (game,)).start()
 
 
 class Game:
@@ -65,6 +72,12 @@ class Game:
         else:
             print(f"{key} pressed")
         pass
+
+    def handle_timer(self):
+        if self._board.move_block('s'):
+            return
+
+        self._board.place_block()
 
     def handle_key_release(self, key: Key):
         pass

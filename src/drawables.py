@@ -85,7 +85,7 @@ class BoardDrawable(Drawable):
                 field = self._board.contents[col_i][row_i]
                 if field:
                     self._screen.addstr(self.y + row_i, self.x + 2 * col_i, '  ',
-                                        field | curses.A_BOLD)
+                                        curses.color_pair(field) | curses.A_BOLD)
                 else:
                     self._screen.addch(self.y + row_i, self.x + 2 * col_i +1, '.',
                                        curses.color_pair(10) | curses.A_BOLD)

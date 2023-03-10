@@ -17,13 +17,13 @@ class Board(Observable):
         [(0, 0), (1, 0), (1, 1), (2, 1)]  # red
     )
     # c, b, o, y, g, p, r
-    COLORS = list(range(10, 18))
+    COLORS = list(range(11, 18))
 
     def __init__(self, size_x, size_y):
         super(Board, self).__init__()
         self.contents = [[None for _ in range(size_y)] for _ in range(size_x)]
-        self.newblock_tiles, self.newblock_color = self._get_random_block()
-        self.nextblock_tiles, self.nextblock_col = self._get_random_block()
+        self.newblock_tiles, self.newblock_color, self.newblock_pivot = self._get_random_block()
+        self.nextblock_tiles, self.nextblock_color, self.nextblock_pivot = self._get_random_block()
 
     def move_block(self, dir: str) -> bool:  # n, s, w, e
         x_offset = -1 if dir is 'w' else 1 if dir is 'e' else 0
@@ -32,17 +32,21 @@ class Board(Observable):
         if not self._validate_position(new_position):
             return False
         self.newblock_tiles = new_position
+        self.newblock_pivot[0] += x_offset
+        self.newblock_pivot[1] += y_offset
         self.notify()
         return True
 
     def rotate_block(self, dir: str) -> bool:  # l, r
+        if self.newblock_color == 14:
+            return True  # yellow block does not rotate
+
         # relative to block's upper left tile
-        pivot_x = 1 + min(x for x, _ in self.newblock_tiles)
-        pivot_y = 0 if self.newblock_color is not 'c' else 1 + min(x for x, _ in self.newblock_tiles)
+        p_x, p_y = self.newblock_pivot
 
         dir = 1 if dir == 'r' else -1
-        rotated = [((pivot_y - y) * dir + pivot_x,
-                    (-1 if self.newblock_color == 'c' else 1) * (-pivot_x + x) * dir + pivot_y)
+        rotated = [((p_y - y) * dir + p_x,
+                    (-1 if self.newblock_color == 11 else 1) * (x - p_x) * dir + p_y)
                    for x, y in self.newblock_tiles]
         if not self._validate_position(rotated):
             return False
@@ -55,20 +59,26 @@ class Board(Observable):
                 y not in range(0, self.size_y)
                 for x, y in new_position]):
             return False
-        return any([self.contents[x][y] is not None
-                    for x, y in new_position])
+        return not any([self.contents[x][y] is not None
+                        for x, y in new_position])
 
     def place_block(self) -> None:
         for x, y in self.newblock_tiles:
             self.contents[x][y] = self.newblock_color
-        self.newblock_tiles, self.newblock_color = self._get_random_block()
+        self.newblock_tiles = self.nextblock_tiles
+        self.newblock_pivot = self.nextblock_pivot
+        self.newblock_color = self.nextblock_color
+
+        self.nextblock_tiles, self.nextblock_color, self.nextblock_pivot = self._get_random_block()
 
         self.notify()
 
-    def _get_random_block(self) -> Tuple[List, str]:
+    def _get_random_block(self) -> Tuple[List, str, List]:
         pick = random.randint(0, 6)
         x_offset = random.randint(3, 5)
-        return [(x + x_offset, y) for x, y in Board.BLOCKS[pick]], Board.COLORS[pick]
+        pivot_x = min(x for x, _ in Board.BLOCKS[pick]) + 1 + x_offset
+        pivot_y = min(y for _, y in Board.BLOCKS[pick]) + 0 if Board.COLORS[pick] != 11 else 1
+        return [(x + x_offset, y) for x, y in Board.BLOCKS[pick]], Board.COLORS[pick], [pivot_x, pivot_y]
 
     @property
     def size_x(self) -> int:
