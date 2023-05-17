@@ -5,12 +5,12 @@ Initially, this was a [Tetris](https://pl.wikipedia.org/wiki/Tetris) clone writt
 
 ### Original project (before rewriting):
 <p float="left">
-  <img src="/images/img_1.png" width="200" />
-  <img src="/images/img_2.png" width="200" /> 
+  <img src="/images/img.png" width="400" />
+  <img src="/images/img_1.png" width="400" /> 
 </p>
 <p float="left">
-  <img src="/images/img_3.png" width="200" />
-  <img src="/img_4.png" width="200" /> 
+  <img src="/images/img_2.png" width="400" />
+  <img src="/images/img_3.png" width="400" /> 
 </p>
 
 The source code lies buried deep in the commit history.
